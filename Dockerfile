@@ -45,6 +45,7 @@ RUN set -Eeuo pipefail && \
     printf 'Package: ifupdown2\nPin: origin download.proxmox.com\nPin-Priority: 1001\n' \
     > /etc/apt/preferences.d/proxmox-ifupdown2 && \
     # Update system and install Proxmox VE
+    apt-get update && \
     apt-get full-upgrade -y && \
     apt-get --no-install-recommends install -y \
       proxmox-ve \
