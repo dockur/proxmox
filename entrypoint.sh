@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Docker environment variables
+
+: "${USERNAME:="root"}"
+: "${PASSWORD:="root"}"
+
 # Helper functions
 
 info () { printf "%b%s%b" "\E[1;34m❯ \E[1;36m" "${1:-}" "\E[0m\n"; }
@@ -11,32 +16,11 @@ trap 'error "Status $? while: $BASH_COMMAND (line $LINENO/$BASH_LINENO)"' ERR
 [[ "${TRACE:-}" == [Yy1]* ]] && set -o functrace && trap 'echo "# $BASH_COMMAND" >&2' DEBUG
 
 # Check environment
-
 [ ! -f "/run/entrypoint.sh" ] && error "Script must be run inside the container!" && exit 11
 [ "$(id -u)" -ne "0" ] && error "Script must be executed with root privileges." && exit 12
 
-# Docker environment variables
-
-: "${USERNAME:="root"}"
-: "${PASSWORD:="root"}"
-
-# Helper variables
-
-ROOTLESS="N"
-PRIVILEGED="N"
-ENGINE="Docker"
-
-if [ -f "/run/.containerenv" ]; then
-  ENGINE="${container:-}"
-  if [[ "${ENGINE,,}" == *"podman"* ]]; then
-    ROOTLESS="Y"
-    ENGINE="Podman"
-  else
-    [ -z "$ENGINE" ] && ENGINE="Kubernetes"
-  fi
-fi
-
-echo "❯ Starting Proxmox for $ENGINE v$(</run/version)..."
+# Display version number
+echo "❯ Starting Proxmox for Docker v$(</run/version)..."
 echo "❯ For support visit https://github.com/dockur/proxmox"
 
 # Get the capability bounding set
@@ -49,18 +33,12 @@ LAST_CAP=$(cat /proc/sys/kernel/cap_last_cap)
 # Calculate the maximum capability value
 MAX_CAP=$(((1 << (LAST_CAP + 1)) - 1))
 
-if [ "${CAP_BND}" -eq "${MAX_CAP}" ]; then
-  ROOTLESS="N"
-  PRIVILEGED="Y"
-fi
-
-if [[ "$PRIVILEGED" != [Yy1]* ]]; then
+if [ "${CAP_BND}" -ne "${MAX_CAP}" ]; then
   error "Please start the container with the --privileged flag!"
   [[ "${DEBUG:-}" != [Yy1]* ]] && exit 14
 fi
 
 # Check if /dev/fuse is available
-
 if [ ! -c /dev/fuse ]; then
   error "Could not access /dev/fuse, make sure this kernel module is loaded!"
   [[ "${DEBUG:-}" != [Yy1]* ]] && exit 16
