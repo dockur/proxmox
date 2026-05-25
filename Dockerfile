@@ -9,7 +9,7 @@ ARG DEBCONF_NOWARNINGS="yes"
 ARG DEBIAN_FRONTEND="noninteractive"
 ARG DEBCONF_NONINTERACTIVE_SEEN="true"
 
-RUN set -euo && \
+RUN set -Eeuo pipefail && \
     apt-get update && \
     # Install prerequisites
     apt-get --no-install-recommends -y install \
