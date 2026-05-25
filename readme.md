@@ -26,7 +26,7 @@ Proxmox inside a Docker container.
 ```yaml
 services:
   proxmox:
-    hostname: proxmox
+    hostname: pve
     image: dockurr/proxmox
     container_name: proxmox
     environment:
@@ -42,7 +42,7 @@ services:
 ##### Via Docker CLI:
 
 ```bash
-docker run -it --rm --name proxmox --hostname proxmox -e "USERNAME=root" -e "PASSWORD=root" -p 8006:8006 --privileged --stop-timeout 60 docker.io/dockurr/proxmox
+docker run -it --rm --name proxmox --hostname pve -e "USERNAME=root" -e "PASSWORD=root" -p 8006:8006 --privileged --stop-timeout 60 docker.io/dockurr/proxmox
 ```
 
 ##### Via Github Codespaces:
