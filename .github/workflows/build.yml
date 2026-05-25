@@ -25,10 +25,7 @@ jobs:
         name: Get remote package data
         run: |
           set -e -o pipefail
-          VERSION=$(mktemp)
-          curl -fsSL http://download.proxmox.com/debian/pve/dists/trixie/pve-no-subscription/binary-amd64/Packages.gz -o "$VERSION"
-          latest_tag=$(gzip -dc "$VERSION" 2>/dev/null | awk '$1=="Package:"&&$2=="pve-manager"{f=1} f&&$1=="Version:"{split($2,a,"-"); print a[1]; exit}' || true )
-          rm -f "$VERSION"
+          latest_tag=$(curl -fsSL http://download.proxmox.com/debian/pve/dists/trixie/Release | awk -F': ' '/^Version:/ {print $2}')
           echo "Found tag: \"${latest_tag}\""
           latest_version="${latest_tag%-*}"
           major="${latest_version%%.*}"
