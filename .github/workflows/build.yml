@@ -24,8 +24,6 @@ jobs:
         name: Get remote package data
         run: |
           set -e -o pipefail
-          sudo apt-get update
-          sudo apt-get -y install zgrep
           latest_tag=$(curl -fsSL http://download.proxmox.com/debian/pve/dists/trixie/pve-no-subscription/binary-amd64/Packages.gz \
           | zgrep -m1 -A1 '^Package: proxmox-ve$' | awk '/^Version:/ {print $2}')"
           echo "Found tag: \"${latest_tag}\"" 
