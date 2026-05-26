@@ -9,7 +9,7 @@ services:
       - 8006:8006
     volumes:
       - ./config:/etc/pve
-      - ./local:/var/lib/vz    
+      - ./storage:/var/lib/vz    
       - /var/run/docker.sock:/var/run/docker.sock      
     restart: always
     privileged: true
