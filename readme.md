@@ -82,9 +82,11 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
   - Attach the `docker0` bridge network to your virtual machine, start that machine and view its screen.
  
-  - Configure the OS for a static IP instead of DHCP, and pick a fixed address inside the subnet of the `docker0` bridge.
+  - Configure the OS for a static IP instead of DHCP, and give it a fixed address inside the subnet of the `docker0` bridge.
 
-    Always start from a value of `.100`, so for example pick `172.0.20.100` for the first machine if the subnet was `172.20.0.0/16`.
+    Always start from a value of `.100`, so for example pick `172.20.0.100` for the first machine if the subnet was `172.20.0.0/16`.
+
+    Set the gateway address to the first address within the subnet, so for example set it to `172.20.0.0` if the subnet was `172.20.0.0/16`.
 
   - The virtual machine should now be connected to the internet!
 
