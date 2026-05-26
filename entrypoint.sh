@@ -77,7 +77,6 @@ fi
 
 # Automaticly add network interfaces
 file="/tmp/interfaces.tmp"
-rm -f "$file"
 
 echo "auto lo" > "$file"
 echo "iface lo inet loopback" >> "$file"
@@ -121,9 +120,13 @@ echo "        bridge-ports $NET_DEV" >> "$file"
 echo "        bridge-stp off" >> "$file"
 echo "        bridge-fd 0" >> "$file"
 
+ifdown --all --allow auto
+ifdown --all --allow hotplug
+
 # Apply configuration
-touch /etc/network/.pve-ignore.interfaces
-mv "$file" /etc/network/interfaces
-ifreload -a
+cp "$file" /etc/network/interfaces
+
+ifup --all --allow auto
+ifup --all --allow hotplug
 
 exec /sbin/init 3
