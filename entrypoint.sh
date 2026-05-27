@@ -106,13 +106,8 @@ else
   fi
 
   # Determine container name
-  target=$(hostname -s)
-  target=$(
-    docker ps -aq |
-    xargs docker inspect -f '{{.Name}} {{.Config.Hostname}}' |
-    awk -v t="$target" '$2 == t {print $1}' |
-    tail -c +2
-  )
+  cid=$(grep -oE '[0-9a-f]{64}' /proc/self/cgroup | head -n1)
+  target=$(docker inspect -f '{{.Name}}' "$cid" | sed 's#^/##')
 
   # Check if container name is valid
   if ! docker inspect "$target" &>/dev/null; then
