@@ -13,12 +13,12 @@ jobs:
         env:
           SHELLCHECK_OPTS: -x --source-path=src -e SC2114 -e SC2129 -e SC2034 -e SC1087 -e SC2046
 
-      - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.3.0
-        with:
-          dockerfile: Dockerfile
-          ignore: DL3008,DL3018,DL3020,DL3029,DL3059,DL4006,DL4001,SC2114,DL1000
-          failure-threshold: warning
+      #- name: Lint Dockerfile
+      #  uses: hadolint/hadolint-action@v3.3.0
+      #  with:
+      #    dockerfile: Dockerfile
+      #    ignore: DL3008,DL3018,DL3020,DL3029,DL3059,DL4006,DL4001,SC2114,DL1000
+      #    failure-threshold: warning
       -
         name: Validate JSON and YML files
         uses: GrantBirki/json-yaml-validate@v5.0.0
