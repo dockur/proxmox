@@ -79,27 +79,27 @@ fi
 # Check if Docker socket is available
 if [ ! -S /var/run/docker.sock ]; then
 
-  error "Docker socket is missing? Please bind /var/run/docker.sock in your compose file." 
+  error "Docker socket is missing? Please bind /var/run/docker.sock in your compose file."
   warn "will skip networking configuration, as it requires the Docker socket to be available."
 
 else
 
   # Create a bridge network called proxnet if not exist
-  
+
   net="proxnet"
   docker network rm "$net" &>/dev/null || true
-  
+
   if ! docker network inspect "$net" &>/dev/null; then
-  
+
     if ! docker network create --driver=bridge "$net" >/dev/null; then
       error "Failed to create bridge network '$net'!" && exit 29
     fi
-  
+
     if ! docker network inspect "$net" &>/dev/null; then
       error "Bridge network '$net' does not exist?" && exit 30
     fi
   fi
-  
+
   # Determine container name
   target=$(hostname -s)
   target=$(
@@ -113,58 +113,58 @@ else
   if ! docker inspect "$target" &>/dev/null; then
     error "Failed to find a container with name: '$target'!" && exit 31
   fi
-  
+
   resp=$(docker inspect "$target")
   network=$(echo "$resp" | jq -r ".[0].NetworkSettings.Networks[\"$net\"]")
-  
+
   if [ -z "$network" ] || [[ "$network" == "null" ]]; then
     if ! docker network connect "$net" "$target"; then
       error "Failed to connect container to bridge network '$net'!" && exit 32
     fi
   fi
-  
+
   # Determine subnet and gateway
   inspect=$(docker network inspect "$net")
   subnet=$(echo "$inspect" | jq -r '.[0].IPAM.Config[0].Subnet')
   gateway=$(echo "$inspect" | jq -r '.[0].IPAM.Config[0].Gateway')
-  
+
   # Automatically add all network interfaces
   file="/etc/network/interfaces.new"
-  
+
   echo "auto lo" > "$file"
   echo "iface lo inet loopback" >> "$file"
-  
+
   while IFS= read -r i; do
-  
+
     echo "" >> "$file"
     echo "auto $i" >> "$file"
     echo "iface $i inet manual" >> "$file"
 
   done <<< $(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | sed 's/@.*//')
-  
+
   echo "" >> "$file"
-  
+
   # Determine which interface is our bridge network
   bridge=""
   base="${subnet%.*}."
-  
+
   while read -r _ iface _ addr _; do
-  
+
     # Check if IP belongs to our subnet
     if [[ "${addr%.*}.${subnet/$base/}" == "$subnet" ]]; then
-  
+
       if [ -z "$bridge" ]; then
         bridge="$iface"
       else
         error "Found multiple interfaces to our bridge network?"
       fi
-  
+
     fi
 
   done <<< $(ip -o -4 addr show)
-  
+
   [ -z "$bridge" ] && error "Could not find interface of bridge?" && exit 35
-  
+
   # Configure bridge
   echo "auto docker0" >> "$file"
   echo "iface docker0 inet static" >> "$file"
