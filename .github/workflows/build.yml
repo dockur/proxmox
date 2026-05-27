@@ -71,7 +71,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=${{ vars.NAME }}
         env:
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
       - 
         name: Set up Docker Buildx
         if: env.exists == 'false'
@@ -99,7 +99,7 @@ jobs:
           context: .
           push: true
           provenance: false
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
