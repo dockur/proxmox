@@ -19,11 +19,6 @@ info "Starting Proxmox for Docker v$(</run/version)..."
 info "For support visit https://github.com/dockur/proxmox"
 echo ""
 
-# Restore backup if /etc is empty
-if [ -d /config ] && [ ! -d /etc/pve ]; then
-  cp -aR /config/. /etc
-fi
-
 # Update password for root
 printf 'root:%s\n' "$PASSWORD" | chpasswd
 
