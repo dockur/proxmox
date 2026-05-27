@@ -60,10 +60,11 @@ SOURCES
 EOF
 
 # Block unneeded packages in container
-COPY <<EOF /etc/apt/preferences.d/99-pve-unneeded-packages
+cat > /etc/apt/preferences.d/99-pve-unneeded-packages <<PKG
 Package: proxmox-default-kernel proxmox-kernel-* pve-firmware
 Pin: release *
 Pin-Priority: -1
+PKG
 EOF
 
 # Prevent services from starting during install
