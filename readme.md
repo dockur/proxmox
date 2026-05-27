@@ -34,8 +34,8 @@ services:
     ports:
       - 8006:8006
     volumes:
-      - ./config:/etc/pve
       - ./storage:/var/lib/vz
+      - ./config:/var/lib/pve-cluster
       - /var/run/docker.sock:/var/run/docker.sock
     restart: always
     privileged: true
@@ -45,7 +45,7 @@ services:
 ##### Via Docker CLI:
 
 ```bash
-docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root" -p 8006:8006 -v "${PWD:-.}/config:/etc/pve" -v "${PWD:-.}/storage:/var/lib/vz" -v "/var/run/docker.sock:/var/run/docker.sock" --stop-timeout 60 docker.io/dockurr/proxmox
+docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root" -p 8006:8006 -v "${PWD:-.}/storage:/var/lib/vz" -v "${PWD:-.}/config:/var/lib/pve-cluster" -v "/var/run/docker.sock:/var/run/docker.sock" --stop-timeout 60 docker.io/dockurr/proxmox
 ```
 
 ##### Via Github Codespaces:
