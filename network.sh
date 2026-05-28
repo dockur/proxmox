@@ -192,12 +192,12 @@ configureNAT() {
 
   # Allow forwarding from bridge -> dev
   if ! iptables -A FORWARD -i "$bridge" -o "$DEV" -j ACCEPT; then
-    error "$tables" && return 1
+    error "failed to configure IP tables!" && return 1
   fi
 
   # Allow return traffic
   if ! iptables -A FORWARD -i "$DEV" -o "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; then
-    error "$tables" && return 1
+    error "failed to configure IP tables!" && return 1
   fi
 
   configureDNS "$bridge" "$ip" "$mask" "$gateway" || return 1
