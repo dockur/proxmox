@@ -23,30 +23,30 @@ configureDNS() {
   local mask="$3"
   local gateway="$4"
 
-  cat >"/etc/dnsmasq.d/$fa.conf" <<EOF
+  cat >"/etc/dnsmasq.d/$fa.conf" <<-EOF
 
-# Listen only on bridge
-interface=$fa
-bind-interfaces
-except-interface=lo
+		# Listen only on bridge
+		interface=$fa
+		bind-interfaces
+		except-interface=lo
 
-# IPv4 DHCP range
-dhcp-range=set:$fa,${ip%.*}.1,${ip%.*}.254
-dhcp-host=$ip
-dhcp-host=$gateway
+		# IPv4 DHCP range
+		dhcp-range=set:$fa,${ip%.*}.1,${ip%.*}.254
+		dhcp-host=$ip
+		dhcp-host=$gateway
 
-# Set gateway address
-dhcp-option=option:netmask,$mask
-dhcp-option=option:router,$gateway
-dhcp-option=option:dns-server,$gateway
-address=/host.lan/$gateway
+		# Set gateway address
+		dhcp-option=option:netmask,$mask
+		dhcp-option=option:router,$gateway
+		dhcp-option=option:dns-server,$gateway
+		address=/host.lan/$gateway
 
-# DHCP settings
-dhcp-authoritative
+		# DHCP settings
+		dhcp-authoritative
 
-# Windows compatibility
-dhcp-option=252,"\n"
-dhcp-option=vendor:MSFT,2,1i
+		# Windows compatibility
+		dhcp-option=252,"\n"
+		dhcp-option=vendor:MSFT,2,1i
 
 EOF
 
