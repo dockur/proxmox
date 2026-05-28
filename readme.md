@@ -16,11 +16,11 @@ Proxmox VE inside a Docker container. Learn, test, break, and repeat.
 ## Features ✨
 
 - **Fast iteration** — Spin up, tear down, repeat in seconds
-- **Cluster simulation** — Test live migration, clustering, and multi-node management
 - **Automation testing** — Validate Terraform, Ansible, or scripts
+- **Cluster simulation** — Test live migration, clustering, and multi-node management
 - **Shared storage** — Mount ISOs, backups, and disk images across all nodes
-- **Dual-Stack Networking** — IPv4 and IPv6 support with pre-configured NAT bridges
-- **KVM & LXC ready** — Virtual machines and containers work out of the box
+- **Dual-stack networking** — IPv4 and IPv6 support with pre-configured NAT bridges
+- **KVM & LXC ready** — Virtual machines and LXC containers work out of the box
 - **ARM64 support** — Proxmox VE on your favorite ARM platform, powered by [PXVIRT](https://docs.pxvirt.lierfang.com/en/README.html)
 
 ## Usage  🐳
