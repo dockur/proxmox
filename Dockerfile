@@ -92,12 +92,13 @@ apt-get install -y --no-install-recommends \
   procps \
   chrony \
   postfix \
-  proxmox-ve \
-  open-iscsi \
   ethtool \
   dnsmasq \
+  iptables \
   iproute2 \
   net-tools \
+  proxmox-ve \
+  open-iscsi \
   iputils-ping \
   docker-ce-cli
 
@@ -178,6 +179,8 @@ rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 
 EOF
 
+WORKDIR /run
+
 COPY --chmod=755 ./network.sh /run/
 COPY --chmod=755 ./entrypoint.sh /run/
 
@@ -193,4 +196,4 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -kLfSs http://localhost:8006 >/dev/null || exit 1
 
 ENTRYPOINT ["/run/entrypoint.sh"]
-CMD ["/sbin/init", "--log-target=console", "--log-level=info"]
+CMD ["/sbin/init", "--log-target=console", "--log-level=notice"]
