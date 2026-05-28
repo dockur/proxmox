@@ -134,6 +134,7 @@ configureNAT() {
   fi
 
   local subnet="$gateway/24"
+  local broadcast="${ip%.*}.255"
 
   # Create a bridge with a static IP for the VM guests
   { ip link add dev "$bridge" type bridge ; rc=$?; } || :
@@ -142,7 +143,7 @@ configureNAT() {
     error "failed to create bridge. $ADD_ERR --cap-add NET_ADMIN" && return 1
   fi
 
-  if ! ip address add "$subnet" broadcast "${ip%.*}.255" dev "$bridge"; then
+  if ! ip address add "$subnet" broadcast "$broadcast" dev "$bridge"; then
     error "failed to add IP address pool!" && return 1
   fi
 
