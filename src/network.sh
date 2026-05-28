@@ -71,6 +71,7 @@ setInterfaces() {
   while IFS= read -r i; do
 
     [[ "${i,,}" == "${fa,,}" ]] && continue
+    [[ "${i,,}" == "${tap,,}" ]] && continue
 
     echo "" >> "$file"
     echo "auto $i" >> "$file"
