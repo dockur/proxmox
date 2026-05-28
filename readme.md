@@ -39,13 +39,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: always
     privileged: true
-    stop_grace_period: 1m
+    stop_grace_period: 2m
 ```
 
 ##### Via Docker CLI:
 
 ```bash
-docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root" -p 8006:8006 -v "${PWD:-.}/storage:/var/lib/vz" -v "${PWD:-.}/config:/var/lib/pve-cluster" -v "/var/run/docker.sock:/var/run/docker.sock" --stop-timeout 60 docker.io/dockurr/proxmox
+docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root" -p 8006:8006 -v "${PWD:-.}/storage:/var/lib/vz" -v "${PWD:-.}/config:/var/lib/pve-cluster" -v "/var/run/docker.sock:/var/run/docker.sock" --stop-timeout 120 docker.io/dockurr/proxmox
 ```
 
 ##### Via Github Codespaces:
