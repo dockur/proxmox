@@ -31,7 +31,9 @@ configureDNS() {
   except-interface=lo
 
   # IPv4 DHCP range
-  dhcp-range=set:$fa,$ip,${ip%.*}.254
+  dhcp-range=set:$fa,${ip%.*}.1,${ip%.*}.254
+  dhcp-host=$ip
+  dhcp-host=$gateway
 
   # Set gateway address
   dhcp-option=option:netmask,$mask
@@ -260,7 +262,7 @@ getInfo() {
   { IP=$(ip address show dev "$DEV" | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/ | head -n 1); rc=$?; } 2>/dev/null || :
 
   if [ -z "$IP" ] || (( rc != 0 )); then
-    error "Could not determine container IP address!" && exit 26
+    error "Could not determine container IPv4 address!" && exit 26
   fi
 
   IP6=""
