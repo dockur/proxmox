@@ -71,10 +71,13 @@ fi
 # Check if Docker socket is available
 if [ ! -S /var/run/docker.sock ]; then
 
+  NETWORK="N"
   error "Docker socket is missing? Please bind /var/run/docker.sock in your compose file."
   warn "will skip networking configuration, as it requires the Docker socket to be available."
 
-else
+fi
+
+if [[ "${NETWORK:-}" != [Nn]* ]]; then
 
   # Create a bridge network called proxnet if not exist
 
@@ -166,6 +169,8 @@ else
   echo "        bridge-stp off" >> "$file"
   echo "        bridge-fd 0" >> "$file"
   echo "" >> "$file"
+
+  . network.sh    # Initialize network
 
 fi
 
