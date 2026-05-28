@@ -178,6 +178,7 @@ rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 
 EOF
 
+COPY --chmod=755 ./network.sh /run/
 COPY --chmod=755 ./entrypoint.sh /run/
 
 ENV PASSWORD="root"
