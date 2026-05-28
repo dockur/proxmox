@@ -302,11 +302,7 @@ msg="Initializing network..."
 [[ "$DEBUG" == [Yy1]* ]] && info "$msg"
 
 getInfo
-
-if [[ -d "/sys/class/net/$TAP" ]]; then
-  info "Lingering interface $TAP will be removed..."
-  ip link delete "$TAP" || true
-fi
+closeBridge
 
 # Configure NAT networking
 if ! configureNAT; then
