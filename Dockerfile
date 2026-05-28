@@ -179,6 +179,7 @@ rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 
 EOF
 
+WORKDIR /run
 COPY --chmod=755 ./src /run/
 
 ENV PASSWORD="root"
