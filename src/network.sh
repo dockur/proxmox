@@ -157,15 +157,15 @@ configureNAT() {
     error "$tuntap" && return 1
   fi
 
-  #if [[ "$MTU" != "0" && "$MTU" != "1500" ]]; then
-  #  if ! ip link set dev "$tap" mtu "$MTU"; then
-  #    warn "failed to set MTU size to $MTU."
-  #  fi
-  #fi
+  if [[ "$MTU" != "0" && "$MTU" != "1500" ]]; then
+    if ! ip link set dev "$tap" mtu "$MTU"; then
+      warn "failed to set MTU size to $MTU."
+    fi
+  fi
 
-  #if ! ip link set dev "$tap" address "$GATEWAY_MAC"; then
-  #  warn "failed to set gateway MAC address.."
-  #fi
+  if ! ip link set dev "$tap" address "$GATEWAY_MAC"; then
+    warn "failed to set gateway MAC address.."
+  fi
 
   while ! ip link set "$tap" up promisc on; do
     info "Waiting for TAP to become available..."
