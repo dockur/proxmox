@@ -3,7 +3,11 @@ set -Eeuo pipefail
 
 # Docker environment variables
 
+: "${MTU:=""}"
+: "${TAP:="tap0"}"
 : "${NETWORK:="Y"}"
+: "${BRIDGE:="vmbr0"}"
+: "${MASK:="255.255.255.0"}"
 
 ADD_ERR="Please add the following setting to your container:"
 
@@ -113,11 +117,7 @@ configureNAT() {
     fi
   fi
 
-  local ip base
-  local tap="tap0"
-  local gateway=""
-  local bridge="vmbr0"
-  local mask="255.255.255.0"
+  local ip base gateway
 
   base=$(echo "$IP" | sed -r 's/([^.]*.){2}//')
 
@@ -137,42 +137,42 @@ configureNAT() {
   local broadcast="${ip%.*}.255"
 
   # Create a bridge with a static IP for the VM guests
-  { ip link add dev "$bridge" type bridge ; rc=$?; } || :
+  { ip link add dev "$BRIDGE" type bridge ; rc=$?; } || :
 
   if (( rc != 0 )); then
     error "failed to create bridge. $ADD_ERR --cap-add NET_ADMIN" && return 1
   fi
 
-  if ! ip address add "$subnet" broadcast "$broadcast" dev "$bridge"; then
+  if ! ip address add "$subnet" broadcast "$broadcast" dev "$BRIDGE"; then
     error "failed to add IP address pool!" && return 1
   fi
 
-  while ! ip link set "$bridge" up; do
+  while ! ip link set "$BRIDGE" up; do
     info "Waiting for IP address to become available..."
     sleep 2
   done
 
   # Set tap to the bridge created
-  if ! ip tuntap add dev "$tap" mode tap; then
+  if ! ip tuntap add dev "$TAP" mode tap; then
     error "$tuntap" && return 1
   fi
 
   if [[ "$MTU" != "0" && "$MTU" != "1500" ]]; then
-    if ! ip link set dev "$tap" mtu "$MTU"; then
+    if ! ip link set dev "$TAP" mtu "$MTU"; then
       warn "failed to set MTU size to $MTU."
     fi
   fi
 
-  if ! ip link set dev "$tap" address "$GATEWAY_MAC"; then
+  if ! ip link set dev "$TAP" address "$GATEWAY_MAC"; then
     warn "failed to set gateway MAC address.."
   fi
 
-  while ! ip link set "$tap" up promisc on; do
+  while ! ip link set "$TAP" up promisc on; do
     info "Waiting for TAP to become available..."
     sleep 2
   done
 
-  if ! ip link set dev "$tap" master "$bridge"; then
+  if ! ip link set dev "$TAP" master "$BRIDGE"; then
     error "failed to set master bridge!" && return 1
   fi
 
@@ -191,17 +191,30 @@ configureNAT() {
   fi
 
   # Allow forwarding from bridge -> dev
-  if ! iptables -A FORWARD -i "$bridge" -o "$DEV" -j ACCEPT; then
+  if ! iptables -A FORWARD -i "$BRIDGE" -o "$DEV" -j ACCEPT; then
     error "failed to configure IP tables!" && return 1
   fi
 
   # Allow return traffic
-  if ! iptables -A FORWARD -i "$DEV" -o "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; then
+  if ! iptables -A FORWARD -i "$DEV" -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; then
     error "failed to configure IP tables!" && return 1
   fi
 
-  configureDNS "$bridge" "$ip" "$mask" "$gateway" || return 1
-  setInterfaces "$bridge" "$tap" "$subnet" "$gateway" || return 1
+  configureDNS "$BRIDGE" "$ip" "$MASK" "$gateway" || return 1
+  setInterfaces "$BRIDGE" "$TAP" "$subnet" "$gateway" || return 1
+
+  return 0
+}
+
+closeBridge() {
+
+  [[ "$NETWORK" == [Nn]* ]] && return 0
+
+  ip link set "$TAP" down promisc off &> /dev/null || true
+  ip link delete "$TAP" &> /dev/null || true
+
+  ip link set "$BRIDGE" down &> /dev/null || true
+  ip link delete "$BRIDGE" &> /dev/null || true
 
   return 0
 }
@@ -276,9 +289,15 @@ msg="Initializing network..."
 
 getInfo
 
+if [[ -d "/sys/class/net/$TAP" ]]; then
+  info "Lingering interface $TAP will be removed..."
+  ip link delete "$TAP" || true
+fi
+
 # Configure NAT networking
 if ! configureNAT; then
 
+  closeBridge
   error "failed to setup NAT networking!"
   [[ "$DEBUG" != [Yy1]* ]] && exit 48
 
