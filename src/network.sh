@@ -93,6 +93,30 @@ setInterfaces() {
   return 0
 }
 
+clearTables() {
+
+  # Choose between iptables or nftables
+  if command -v iptables-nft >/dev/null 2>&1 && iptables-nft -V >/dev/null 2>&1; then
+    update-alternatives --set iptables /usr/sbin/iptables-nft > /dev/null
+    update-alternatives --set ip6tables /usr/sbin/ip6tables-nft > /dev/null
+  else
+    update-alternatives --set iptables /usr/sbin/iptables-legacy > /dev/null
+    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy > /dev/null
+  fi
+
+  iptables -P INPUT ACCEPT &> /dev/null || true
+  iptables -P FORWARD ACCEPT &> /dev/null || true
+  iptables -P OUTPUT ACCEPT &> /dev/null || true
+  iptables -t nat -F &> /dev/null || true
+  iptables -t raw -F &> /dev/null || true
+  iptables -t filter -F &> /dev/null || true
+  iptables -t mangle -F &> /dev/null || true
+  iptables -F &> /dev/null || true
+  iptables -X &> /dev/null || true
+
+  return 0
+}
+
 configureNAT() {
 
   local tuntap="TUN device is missing. $ADD_ERR --device /dev/net/tun"
@@ -178,14 +202,8 @@ configureNAT() {
     error "failed to set master bridge!" && return 1
   fi
 
-  # Choose between iptables or nftables
-  if command -v iptables-nft >/dev/null 2>&1 && iptables-nft -V >/dev/null 2>&1; then
-    update-alternatives --set iptables /usr/sbin/iptables-nft > /dev/null
-    update-alternatives --set ip6tables /usr/sbin/ip6tables-nft > /dev/null
-  else
-    update-alternatives --set iptables /usr/sbin/iptables-legacy > /dev/null
-    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy > /dev/null
-  fi
+  # Flush existing tables
+  clearTables
 
   # NAT traffic from bridge subnet to Docker uplink
   if ! iptables -t nat -A POSTROUTING -o "$DEV" -s "$subnet" ! -d "$subnet" -j MASQUERADE; then
@@ -216,6 +234,7 @@ closeBridge() {
   ip link set "$BRIDGE" down &> /dev/null || true
   ip link delete "$BRIDGE" &> /dev/null || true
 
+  clearTables
   return 0
 }
 
