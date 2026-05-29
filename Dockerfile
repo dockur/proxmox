@@ -147,36 +147,51 @@ rm -rf /usr/lib/firmware
 
 # Remove GPU/display/media libs — no display server, no GPU passthrough needed
 rm -f \
-  /usr/lib/x86_64-linux-gnu/libLLVM*.so* \
-  /usr/lib/x86_64-linux-gnu/libgallium*.so* \
-  /usr/lib/x86_64-linux-gnu/libvulkan_*.so* \
-  /usr/lib/x86_64-linux-gnu/libz3.so* \
-  /usr/lib/x86_64-linux-gnu/libx265.so* \
-  /usr/lib/x86_64-linux-gnu/libcodec2.so* \
-  /usr/lib/x86_64-linux-gnu/libavcodec.so* \
-  /usr/lib/x86_64-linux-gnu/libavfilter.so* \
-  /usr/lib/x86_64-linux-gnu/libSvtAv1Enc.so* \
-  /usr/lib/x86_64-linux-gnu/libplacebo.so*
+  /usr/lib/*/libLLVM*.so* \
+  /usr/lib/*/libgallium*.so* \
+  /usr/lib/*/libvulkan_*.so* \
+  /usr/lib/*/libz3.so* \
+  /usr/lib/*/libx265.so* \
+  /usr/lib/*/libcodec2.so* \
+  /usr/lib/*/libavcodec.so* \
+  /usr/lib/*/libavfilter.so* \
+  /usr/lib/*/libSvtAv1Enc.so* \
+  /usr/lib/*/libplacebo.so*
 
 rm -rf \
-  /usr/lib/x86_64-linux-gnu/dri \
-  /usr/lib/x86_64-linux-gnu/gstreamer-1.0
+  /usr/lib/*/dri \
+  /usr/lib/*/gstreamer-1.0
 
+# Remove X11 client libs — no display server in a container
 rm -f \
-  /usr/lib/aarch64-linux-gnu/libLLVM*.so* \
-  /usr/lib/aarch64-linux-gnu/libgallium*.so* \
-  /usr/lib/aarch64-linux-gnu/libvulkan_*.so* \
-  /usr/lib/aarch64-linux-gnu/libz3.so* \
-  /usr/lib/aarch64-linux-gnu/libx265.so* \
-  /usr/lib/aarch64-linux-gnu/libcodec2.so* \
-  /usr/lib/aarch64-linux-gnu/libavcodec.so* \
-  /usr/lib/aarch64-linux-gnu/libavfilter.so* \
-  /usr/lib/aarch64-linux-gnu/libSvtAv1Enc.so* \
-  /usr/lib/aarch64-linux-gnu/libplacebo.so*
+  /usr/lib/*/libX11.so* \
+  /usr/lib/*/libXext.so* \
+  /usr/lib/*/libXrender.so* \
+  /usr/lib/*/libXrandr.so* \
+  /usr/lib/*/libXi.so* \
+  /usr/lib/*/libXfixes.so* \
+  /usr/lib/*/libXcursor.so* \
+  /usr/lib/*/libXcomposite.so* \
+  /usr/lib/*/libXdamage.so*
 
-rm -rf \
-  /usr/lib/aarch64-linux-gnu/dri \
-  /usr/lib/aarch64-linux-gnu/gstreamer-1.0
+# Remove OpenGL/EGL libs — no GPU rendering in a container
+rm -f \
+  /usr/lib/*/libGL.so* \
+  /usr/lib/*/libEGL.so* \
+  /usr/lib/*/libGLX.so* \
+  /usr/lib/*/libGLESv2.so*
+
+# Remove GTK/Cairo display-stack libs — no GUI toolkit needed in a container
+rm -f \
+  /usr/lib/*/libcairo*.so* \
+  /usr/lib/*/libpango*.so* \
+  /usr/lib/*/libgtk-3.so* \
+  /usr/lib/*/libgdk-3.so*
+
+# Remove audio libs — no sound output in a container
+rm -f \
+  /usr/lib/*/libasound.so* \
+  /usr/lib/*/libpulse*.so*
 
 # Remove share assets not needed at runtime
 rm -rf \
@@ -187,7 +202,10 @@ rm -rf \
   /usr/share/grub \
   /usr/share/groff \
   /usr/share/mime \
-  /usr/share/man
+  /usr/share/man \
+  /usr/share/sounds \
+  /usr/share/lintian \
+  /usr/share/common-licenses
 
 # Set username and password
 echo "root:root" | chpasswd
