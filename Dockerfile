@@ -107,7 +107,7 @@ apt-get install -y --no-install-recommends \
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
       /etc/apt/sources.list.d/pve-enterprise.sources \
       /etc/apt/sources.list.d/ceph.list \
-      /etc/apt/sources.list.d/ceph.source
+      /etc/apt/sources.list.d/ceph.sources
 
 # Disable subscription nag popup
 if [[ "$TARGETARCH" == "amd64" ]]; then
