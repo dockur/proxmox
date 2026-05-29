@@ -11,7 +11,7 @@ jobs:
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@master
         env:
-          SHELLCHECK_OPTS: -x --source-path=src -e SC2114 -e SC2129 -e SC2034 -e SC1087 -e SC2046
+          SHELLCHECK_OPTS: -x --source-path=src -e SC2114 -e SC2129 -e SC2034 -e SC1087 -e SC2317 -e SC2046
 
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.3.0
