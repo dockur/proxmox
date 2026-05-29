@@ -24,14 +24,9 @@ apt-get update
 apt-get --no-install-recommends -y install \
   jq \
   curl \
-  gnupg \
   ca-certificates
 apt-get clean
 rm -rf /var/lib/apt/lists/*
-
-# Add Docker archive keyring
-curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/debian trixie stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Add Proxmox archive keyring
 if [ "${TARGETARCH}" = "amd64" ]; then
@@ -81,10 +76,10 @@ mkdir -p /usr/share/doc/pve-manager
 touch /usr/share/doc/pve-manager/aplinfo.dat
 
 # Pin ifupdown2 to the Proxmox repo — pve-manager checks for their patched version
-if [ "${TARGETARCH}" = "arm64" ]; then
-  PVE_ORIGIN="mirrors.lierfang.com"
-else
+if [[ "${TARGETARCH}" != "arm64" ]]; then
   PVE_ORIGIN="download.proxmox.com"
+else
+  PVE_ORIGIN="mirrors.lierfang.com"
 fi
 printf 'Package: ifupdown2\nPin: origin %s\nPin-Priority: 1001\n' "$PVE_ORIGIN" > /etc/apt/preferences.d/proxmox-ifupdown2
 
@@ -94,6 +89,7 @@ apt-get full-upgrade -y
 apt-get install -y --no-install-recommends \
   nano \
   wget \
+  gnupg \
   procps \
   chrony \
   postfix \
@@ -104,8 +100,7 @@ apt-get install -y --no-install-recommends \
   net-tools \
   proxmox-ve \
   open-iscsi \
-  iputils-ping \
-  docker-ce-cli
+  iputils-ping
 
 # Remove enterprise repo added by Proxmox packages — keep only no-subscription
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
@@ -162,37 +157,6 @@ rm -rf \
   /usr/lib/*/dri \
   /usr/lib/*/gstreamer-1.0
 
-# Remove X11 client libs — no display server in a container
-rm -f \
-  /usr/lib/*/libX11.so* \
-  /usr/lib/*/libXext.so* \
-  /usr/lib/*/libXrender.so* \
-  /usr/lib/*/libXrandr.so* \
-  /usr/lib/*/libXi.so* \
-  /usr/lib/*/libXfixes.so* \
-  /usr/lib/*/libXcursor.so* \
-  /usr/lib/*/libXcomposite.so* \
-  /usr/lib/*/libXdamage.so*
-
-# Remove OpenGL/EGL libs — no GPU rendering in a container
-rm -f \
-  /usr/lib/*/libGL.so* \
-  /usr/lib/*/libEGL.so* \
-  /usr/lib/*/libGLX.so* \
-  /usr/lib/*/libGLESv2.so*
-
-# Remove GTK/Cairo display-stack libs — no GUI toolkit needed in a container
-rm -f \
-  /usr/lib/*/libcairo*.so* \
-  /usr/lib/*/libpango*.so* \
-  /usr/lib/*/libgtk-3.so* \
-  /usr/lib/*/libgdk-3.so*
-
-# Remove audio libs — no sound output in a container
-rm -f \
-  /usr/lib/*/libasound.so* \
-  /usr/lib/*/libpulse*.so*
-
 # Remove share assets not needed at runtime
 rm -rf \
   /usr/share/pocketsphinx \
@@ -202,10 +166,7 @@ rm -rf \
   /usr/share/grub \
   /usr/share/groff \
   /usr/share/mime \
-  /usr/share/man \
-  /usr/share/sounds \
-  /usr/share/lintian \
-  /usr/share/common-licenses
+  /usr/share/man
 
 # Set username and password
 echo "root:root" | chpasswd
