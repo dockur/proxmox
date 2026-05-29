@@ -114,7 +114,8 @@ apt-get autoremove -y
 apt-get clean
 
 # Mask unneeded services
-systemctl mask systemd-networkd-wait-online.service watchdog-mux.service
+ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
+ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
 
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
