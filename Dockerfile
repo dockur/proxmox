@@ -62,6 +62,9 @@ SOURCES
 printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d
 chmod +x /usr/sbin/policy-rc.d
 
+# Mask unneeded services
+systemctl mask systemd-networkd-wait-online.service watchdog-mux.service
+
 # Stub commands unavailable / problematic in a Docker build
 dpkg-divert --local --rename --add /usr/bin/unshare
 printf '#!/bin/sh\nwhile [ $# -gt 0 ] && [ "$1" != "--" ]; do shift; done\n[ "$1" = "--" ] && \
@@ -113,9 +116,6 @@ rm -f /etc/apt/sources.list.d/pve-enterprise.list \
 apt-get remove -y os-prober >/dev/null
 apt-get autoremove -y
 apt-get clean
-
-# Mask unneeded services
-systemctl mask systemd-networkd-wait-online.service watchdog-mux.service
 
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
