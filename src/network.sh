@@ -26,7 +26,7 @@ configureDNS() {
   local ip_last="${ip##*.}"
   local gw_last="${gateway##*.}"
 
-  # Determine the sorted positions of the two excluded IPs
+  # Determine the sorted positions
   local low high
   if (( ip_last < gw_last )); then
     low=$ip_last; high=$gw_last
@@ -34,7 +34,7 @@ configureDNS() {
     low=$gw_last; high=$ip_last
   fi
 
-  # Build dhcp-range lines, splitting the pool around $ip and $gateway.
+  # Build dhcp-range lines
   local ranges=""
   (( low > 1 )) && ranges+="dhcp-range=set:${fa},${base}.1,${base}.$((low - 1))"$'\n'
   (( high - low > 1 )) && ranges+="dhcp-range=set:${fa},${base}.$((low + 1)),${base}.$((high - 1))"$'\n'
@@ -117,15 +117,19 @@ clearTables() {
     update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy > /dev/null
   fi
 
-  iptables -P INPUT ACCEPT &> /dev/null || true
-  iptables -P FORWARD ACCEPT &> /dev/null || true
-  iptables -P OUTPUT ACCEPT &> /dev/null || true
-  iptables -t nat -F &> /dev/null || true
-  iptables -t raw -F &> /dev/null || true
-  iptables -t filter -F &> /dev/null || true
-  iptables -t mangle -F &> /dev/null || true
-  iptables -F &> /dev/null || true
-  iptables -X &> /dev/null || true
+  # Delete every rule tagged with our unique identifier, leaving all other rules intact.
+  local table="" line
+  while IFS= read -r line; do
+    case "$line" in
+      \*nat)    table="nat" ;;
+      \*filter) table="filter" ;;
+      \*mangle) table="mangle" ;;
+      \*raw)    table="raw" ;;
+    esac
+    if [[ "$line" == -A* && "$line" == *"--comment \"remove\""* ]]; then
+      echo "${line/-A /-D }" | xargs iptables -t "$table" 2>/dev/null || true
+    fi
+  done < <(iptables-save 2>/dev/null)
 
   return 0
 }
@@ -203,7 +207,7 @@ configureNAT() {
   fi
 
   if ! ip link set dev "$TAP" address "$GATEWAY_MAC"; then
-    warn "failed to set gateway MAC address.."
+    warn "failed to set gateway MAC address."
   fi
 
   while ! ip link set "$TAP" up promisc on; do
@@ -219,17 +223,17 @@ configureNAT() {
   clearTables
 
   # NAT traffic from bridge subnet to Docker uplink
-  if ! iptables -t nat -A POSTROUTING -o "$DEV" -s "$subnet" ! -d "$subnet" -j MASQUERADE; then
+  if ! iptables -t nat -A POSTROUTING -o "$DEV" -s "$subnet" ! -d "$subnet" -m comment --comment "remove" -j MASQUERADE; then
     error "$tables" && return 1
   fi
 
   # Allow forwarding from bridge -> dev
-  if ! iptables -A FORWARD -i "$BRIDGE" -o "$DEV" -j ACCEPT; then
+  if ! iptables -A FORWARD -i "$BRIDGE" -o "$DEV" -m comment --comment "remove" -j ACCEPT; then
     error "failed to configure IP tables!" && return 1
   fi
 
   # Allow return traffic
-  if ! iptables -A FORWARD -i "$DEV" -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; then
+  if ! iptables -A FORWARD -i "$DEV" -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "remove" -j ACCEPT; then
     error "failed to configure IP tables!" && return 1
   fi
 
