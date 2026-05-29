@@ -99,7 +99,6 @@ apt-get install -y --no-install-recommends \
   dnsmasq \
   iptables \
   iproute2 \
-  ifconfig \
   net-tools \
   proxmox-ve \
   open-iscsi \
