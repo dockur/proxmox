@@ -72,6 +72,6 @@ if [ -n "$KVM_ERR" ]; then
 fi
 
 # Initialize network
-. network.sh    
+. network.sh
 
 exec "$@"
