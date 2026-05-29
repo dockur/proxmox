@@ -103,6 +103,12 @@ EOF
         bridge-ports $tap
         bridge-stp off
         bridge-fd 0
+
+    auto vmbr1
+    iface vmbr1 inet static
+        bridge-ports none
+        bridge-stp off
+        bridge-fd 0
 EOF
 
   return 0
