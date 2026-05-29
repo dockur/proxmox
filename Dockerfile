@@ -115,6 +115,9 @@ if [[ "$TARGETARCH" == "amd64" ]]; then
   echo "127.0.0.1 shop.maurer-it.com" | sudo tee -a /etc/hosts
 fi
 
+# Prevent system updates
+apt-mark hold proxmox-ve
+
 # Cleanup
 apt-get remove -y os-prober >/dev/null
 apt-get autoremove -y
