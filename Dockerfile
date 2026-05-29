@@ -81,7 +81,12 @@ mkdir -p /usr/share/doc/pve-manager
 touch /usr/share/doc/pve-manager/aplinfo.dat
 
 # Pin ifupdown2 to the Proxmox repo — pve-manager checks for their patched version
-printf 'Package: ifupdown2\nPin: origin download.proxmox.com\nPin-Priority: 1001\n' > /etc/apt/preferences.d/proxmox-ifupdown2
+if [ "${TARGETARCH}" = "arm64" ]; then
+  PVE_PIN_ORIGIN="mirrors.lierfang.com"
+else
+  PVE_PIN_ORIGIN="download.proxmox.com"
+fi
+printf 'Package: ifupdown2\nPin: origin %s\nPin-Priority: 1001\n' "$PVE_PIN_ORIGIN" > /etc/apt/preferences.d/proxmox-ifupdown2
 
 # Update system and install Proxmox VE
 apt-get update

@@ -56,9 +56,11 @@ else
   if ! sh -c 'echo -n > /dev/kvm' &> /dev/null; then
     KVM_ERR="(/dev/kvm is unwriteable)"
   else
-    flags=$(sed -ne '/^flags/s/^.*: //p' /proc/cpuinfo)
-    if ! grep -qw "vmx\|svm" <<< "$flags"; then
-      KVM_ERR="(not enabled in BIOS)"
+    if [ "$(uname -m)" = "x86_64" ]; then
+      flags=$(sed -ne '/^flags/s/^.*: //p' /proc/cpuinfo)
+      if ! grep -qw "vmx\|svm" <<< "$flags"; then
+        KVM_ERR="(not enabled in BIOS)"
+      fi
     fi
   fi
 fi
