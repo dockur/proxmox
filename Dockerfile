@@ -196,6 +196,7 @@ echo "root:root" | chpasswd
 echo "$VERSION_ARG" > /usr/local/bin/version
 
 # Cleanup files
+rm /usr/local/sbin/systemctl
 rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 
 EOF
