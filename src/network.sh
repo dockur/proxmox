@@ -297,7 +297,7 @@ getInfo() {
 
   local result bus
   result=$(ethtool -i "$DEV")
-  bus=$(grep -m 1 -i 'bus-info:' <<< "$result" | awk '{print $(2)}')
+  bus=$(grep -m 1 -i 'bus-info:' <<< "$result" | awk '{print $2}')
 
   if [[ "${bus,,}" != "" && "${bus,,}" != "n/a" && "${bus,,}" != "tap" ]]; then
     [[ "$DEBUG" == [Yy1]* ]] && info "Detected BUS: $bus"
