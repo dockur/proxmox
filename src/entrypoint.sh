@@ -12,11 +12,11 @@ error () { printf "%b%s%b" "\E[1;31m❯ " "ERROR: ${1:-}" "\E[0m\n" >&2; }
 warn () { printf "%b%s%b" "\E[1;31m❯ " "Warning: ${1:-}" "\E[0m\n" >&2; }
 
 # Check environment
-[ ! -f "/run/entrypoint.sh" ] && error "Script must be run inside the container!" && exit 11
-[ "$(id -u)" -ne "0" ] && error "Script must be executed with root privileges." && exit 12
+[ "$(id -u)" -ne "0" ] && error "Script must be executed with root privileges." && exit 11
+[ ! -f "/usr/local/bin/entrypoint.sh" ] && error "Script must be run inside the container!" && exit 12
 
 # Display version number
-info "Starting Proxmox for Docker v$(</run/version)..."
+info "Starting Proxmox for Docker v$(</usr/local/bin/version)..."
 info "For support visit https://github.com/dockur/proxmox"
 echo ""
 
