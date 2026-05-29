@@ -108,7 +108,7 @@ rm -f /etc/apt/sources.list.d/pve-enterprise.list \
       /etc/apt/sources.list.d/ceph.list \
       /etc/apt/sources.list.d/ceph.source
 
-# Disable subscription nag
+# Disable subscription nag popup
 if [[ "$TARGETARCH" == "amd64" ]]; then
   wget https://github.com/Jamesits/pve-fake-subscription/releases/download/v0.0.11/pve-fake-subscription_0.0.11+git-1_all.deb -O /tmp/sub.deb -q --timeout=10
   apt-get install ./tmp/sub.deb && rm -f /tmp/sub.deb
