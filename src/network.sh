@@ -89,8 +89,8 @@ EOF
 
     cat >> "$file" <<-EOF
 
-        auto $i
-        iface $i inet manual
+      auto $i
+      iface $i inet manual
 EOF
 
   done < <(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | sed 's/@.*//')
