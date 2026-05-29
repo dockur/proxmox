@@ -85,7 +85,6 @@ EOF
   while IFS= read -r i; do
 
     [[ "${i,,}" == "${fa,,}" ]] && continue
-    [[ "${i,,}" == "${tap,,}" ]] && continue
 
     cat >> "$file" <<-EOF
 
