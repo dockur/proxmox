@@ -113,6 +113,9 @@ apt-get remove -y os-prober >/dev/null
 apt-get autoremove -y
 apt-get clean
 
+# Mask unneeded services
+systemctl mask systemd-networkd-wait-online.service watchdog-mux.service
+
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
     A7BCD1420BFE778E \
