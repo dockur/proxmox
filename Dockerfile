@@ -157,6 +157,22 @@ rm -rf \
   /usr/lib/x86_64-linux-gnu/dri \
   /usr/lib/x86_64-linux-gnu/gstreamer-1.0
 
+rm -f \
+  /usr/lib/aarch64-linux-gnu/libLLVM*.so* \
+  /usr/lib/aarch64-linux-gnu/libgallium*.so* \
+  /usr/lib/aarch64-linux-gnu/libvulkan_*.so* \
+  /usr/lib/aarch64-linux-gnu/libz3.so* \
+  /usr/lib/aarch64-linux-gnu/libx265.so* \
+  /usr/lib/aarch64-linux-gnu/libcodec2.so* \
+  /usr/lib/aarch64-linux-gnu/libavcodec.so* \
+  /usr/lib/aarch64-linux-gnu/libavfilter.so* \
+  /usr/lib/aarch64-linux-gnu/libSvtAv1Enc.so* \
+  /usr/lib/aarch64-linux-gnu/libplacebo.so*
+
+rm -rf \
+  /usr/lib/aarch64-linux-gnu/dri \
+  /usr/lib/aarch64-linux-gnu/gstreamer-1.0
+
 # Remove share assets not needed at runtime
 rm -rf \
   /usr/share/pocketsphinx \
