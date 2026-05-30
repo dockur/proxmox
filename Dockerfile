@@ -139,6 +139,10 @@ ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
 ln -sf /dev/null /etc/systemd/system/ifupdown2-pre.service
 ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
 
+# Prevent SDN warning
+mkdir -p /etc/network/interfaces.d
+touch /etc/network/interfaces.d/sdn
+
 # Disable keyboard request target
 cat >/etc/systemd/system/kbrequest.target <<KBR
 [Unit]
