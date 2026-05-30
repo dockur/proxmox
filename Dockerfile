@@ -147,7 +147,6 @@ Description=Keyboard Request Target
 [Target]
 KBR
 
-systemctl daemon-reload
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
     A7BCD1420BFE778E \
