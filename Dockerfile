@@ -104,10 +104,14 @@ apt-get install -y --no-install-recommends \
   iproute2 \
   ifupdown2 \
   net-tools \
+  nfs-common \
+  cifs-utils \
   proxmox-ve \
   open-iscsi \
-  iputils-ping
-
+  iputils-ping \
+  bridge-utils \
+  isc-dhcp-client
+  
 # Remove enterprise repo added by Proxmox packages — keep only no-subscription
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
       /etc/apt/sources.list.d/pve-enterprise.sources \
@@ -142,7 +146,7 @@ ExecStart=/bin/true
 SRV
 
 # Add keyring for pveam
-gpg --keyserver keyserver.ubuntu.com --recv-keys \
+gpg --keyserver keyserver.uuntu.com --recv-keys \
     A7BCD1420BFE778E \
     85C25E95A16EB94D \
     39DE63C7D57A32124785E63DB859507D6B1F46D3
