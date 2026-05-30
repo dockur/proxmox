@@ -135,13 +135,10 @@ apt-get remove -y sudo os-prober
 apt-get autoremove -y
 apt-get clean
 
-# Fix ifupdown2-pre.service for container (no udev)
-mkdir -p /etc/systemd/system/ifupdown2-pre.service.d
-cat > /etc/systemd/system/ifupdown2-pre.service.d/override.conf <<SRV
-[Service]
-ExecStart=
-ExecStart=/bin/true
-SRV
+# Mask unneeded services
+ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
+ln -sf /dev/null /etc/systemd/system/ifupdown2-pre.service
+ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
 
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
