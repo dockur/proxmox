@@ -77,7 +77,7 @@ setInterfaces() {
   # Add all available network interfaces
   local file="/etc/network/interfaces.new"
 
-  cat > "$file" <<-EOF
+  cat <<EOF | sed 's/^    //g' > "$file"
     auto lo
     iface lo inet loopback
 EOF
@@ -86,16 +86,16 @@ EOF
 
     [[ "${i,,}" == "${fa,,}" ]] && continue
 
-    cat >> "$file" <<-EOF
+    cat <<EOF | sed 's/^        //g' > "$file"
 
-      auto $i
-      iface $i inet manual
+        auto $i
+        iface $i inet manual
 EOF
 
   done < <(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | sed 's/@.*//')
 
   # Configure bridge
-  cat >> "$file" <<-EOF
+  cat <<EOF | sed 's/^    //g' > "$file"
 
     auto $fa
     iface $fa inet static
