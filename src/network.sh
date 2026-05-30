@@ -42,8 +42,7 @@ configureDNS() {
   (( high < 254 )) && ranges+="dhcp-range=set:${fa},${base}.$((high + 1)),${base}.254"$'\n'
   ranges="${ranges%$'\n'}"  # strip trailing newline
 
-{
-  cat <<EOF
+  sed 's/^    //' > "$file" <<EOF
 
     # Listen only on bridge
     interface=$fa
@@ -66,7 +65,6 @@ configureDNS() {
     dhcp-option=252,"\n"
     dhcp-option=vendor:MSFT,2,1i
 EOF
-} | sed 's/^    //' > "$file"
 
   cat "$file" && sleep 5
   return 0
@@ -81,30 +79,25 @@ setInterfaces() {
   # Add all available network interfaces
   local file="/etc/network/interfaces.new"
 
-{
-  cat <<EOF
+  sed 's/^    //' > "$file" <<EOF
     auto lo
     iface lo inet loopback
 EOF
-} | sed 's/^    //' > "$file"
 
   while IFS= read -r i; do
 
     [[ "${i,,}" == "${fa,,}" ]] && continue
 
-{
-    cat <<EOF
+    sed 's/^        //' >> "$file" <<EOF
 
         auto $i
         iface $i inet manual
 EOF
-} | sed 's/^        //' >> "$file"
 
   done < <(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | sed 's/@.*//')
 
   # Configure bridge
-{
-  cat <<EOF
+  sed 's/^    //' >> "$file" <<EOF
 
     auto $fa
     iface $fa inet static
@@ -115,7 +108,6 @@ EOF
 
     source /etc/network/interfaces.d/*
 EOF
-} | sed 's/^    //' >> "$file"
 
   cat "$file" && sleep 5
   return 0
