@@ -121,11 +121,11 @@ ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
 ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
 
 # Fix ifupdown2-pre.service for container (no udev)
-COPY <<'EOF' /etc/systemd/system/ifupdown2-pre.service.d/override.conf
+cat > /etc/systemd/system/ifupdown2-pre.service.d/override.conf <<SRV
 [Service]
 ExecStart=
 ExecStart=/bin/true
-EOF
+SRV
 
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
