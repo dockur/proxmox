@@ -75,15 +75,6 @@ chmod +x /usr/local/sbin/systemctl
 mkdir -p /usr/share/doc/pve-manager
 touch /usr/share/doc/pve-manager/aplinfo.dat
 
-# Pin ifupdown2 to the Proxmox repo — pve-manager checks for their patched version
-if [[ "$TARGETARCH" == "amd64" ]]; then
-  PVE_ORIGIN="download.proxmox.com"
-else
-  PVE_ORIGIN="mirrors.lierfang.com"
-fi
-printf 'Package: ifupdown2\nPin: origin %s\nPin-Priority: 1001\n' \
-"$PVE_ORIGIN" > /etc/apt/preferences.d/proxmox-ifupdown2
-
 # Update system and install Proxmox VE
 apt-get update
 apt-get full-upgrade -y
@@ -139,7 +130,7 @@ ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
 ln -sf /dev/null /etc/systemd/system/ifupdown2-pre.service
 ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
 
-# Disable keyboard request target
+# Disable keyboard request target (for Docker TTY)
 cat >/etc/systemd/system/kbrequest.target <<KBR
 [Unit]
 Description=Keyboard Request Target
