@@ -108,10 +108,10 @@ apt-get install -y --no-install-recommends \
   cifs-utils \
   proxmox-ve \
   open-iscsi \
-  iputils-ping \
   bridge-utils \
+  iputils-ping \
   isc-dhcp-client
-  
+
 # Remove enterprise repo added by Proxmox packages — keep only no-subscription
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
       /etc/apt/sources.list.d/pve-enterprise.sources \
@@ -209,8 +209,11 @@ echo "root:root" | chpasswd
 # Store version number
 echo "$VERSION_ARG" > /etc/version
 
-# Cleanup files
+# Remove stubs
+rm /usr/sbin/ifreload
 rm /usr/local/sbin/systemctl
+
+# Cleanup files
 rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 
 EOF
@@ -230,4 +233,4 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -kLfSs http://localhost:8006 >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["/sbin/init", "--log-target=console", "--log-level=warning"]
+CMD ["/sbin/init", "--log-target=console", "--log-level=info"]
