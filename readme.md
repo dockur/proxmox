@@ -15,7 +15,7 @@ Proxmox VE inside a Docker container.
 
 ## Features ✨
 
-- **High-performance** — Performs identically to bare-metal thanks to KVM acceleration
+- **High-performance** — Identically to bare-metal thanks to KVM acceleration
 - **Fast iteration** — Spin up or tear down a PVE node quickly within seconds
 - **Easy backups** — Stores all your configuration in a volume mount
 - **Simple networking** — Comes with a pre-configured NAT bridge with DHCP
