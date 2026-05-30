@@ -89,15 +89,20 @@ apt-get full-upgrade -y
 apt-get install -y --no-install-recommends \
   nano \
   wget \
-  gnupg \
   sudo \
+  htop \
+  iotop \
+  gnupg \
   procps \
   chrony \
   postfix \
   ethtool \
   dnsmasq \
+  dnsutils \
+  sysstat \
   iptables \
   iproute2 \
+  ifupdown2 \
   net-tools \
   proxmox-ve \
   open-iscsi \
@@ -128,6 +133,14 @@ apt-get clean
 ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
 ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
 
+# Fix ifupdown2-pre.service for container (no udev)
+mkdir -p /etc/systemd/system/ifupdown2-pre.service.d
+cat > /etc/systemd/system/ifupdown2-pre.service.d/override.conf <<SRV
+[Service]
+ExecStart=
+ExecStart=/bin/true
+SRV
+
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
     A7BCD1420BFE778E \
@@ -150,7 +163,7 @@ echo "LISTEN_IP=\"0.0.0.0\"" >> /etc/default/pveproxy
 
 # Update PVE banner to display the IPv4 address
 sed -i "s|https://\${urlip}:8006/|http://localhost:8006|g" /usr/bin/pvebanner
-sed -i "s|Welcome to the Proxmox Virtual Environment\.|Welcome to Proxmox for Docker v${VERSION_ARG}.|g" /usr/bin/pvebanner
+sed -i "s|the Proxmox Virtual Environment\.|Proxmox for Docker v${VERSION_ARG}.|g" /usr/bin/pvebanner
 
 # Remove kernel modules and boot files — useless in a container (~960 MB)
 rm -rf /usr/lib/modules /boot
