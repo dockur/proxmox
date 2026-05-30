@@ -250,8 +250,8 @@ configureNAT() {
   return 0
 }
 
-disableLicense() {
- 
+blockLicense() {
+
   # Disable connections to license server
   echo "127.0.0.1 shop.maurer-it.com" >> /etc/hosts
 
@@ -342,7 +342,7 @@ getInfo() {
 #  Configure Network
 # ######################################
 
-disableLicense
+blockLicense
 
 [[ "$NETWORK" == [Nn]* ]] && return 0
 
