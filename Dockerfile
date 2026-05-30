@@ -143,24 +143,6 @@ ExecStart=
 ExecStart=/bin/true
 SRV
 
-# Fix lxcfs.service to suppress error during shutdown
-mkdir -p /etc/systemd/system/lxcfs.service.d
-cat > /etc/systemd/system/lxcfs.service.d/override.conf <<CFS
-[Service]
-# Prevent systemd from trying to supervise shutdown cleanup
-ExecStop=
-ExecStop=/bin/true
-
-# Avoid waiting for FUSE teardown (important in Docker shutdown race)
-TimeoutStopSec=1
-
-# Prevent systemd from aggressively killing after ExecStop
-KillMode=control-group
-
-# Ensure stop never propagates failure from internal cleanup
-SuccessExitStatus=0 143
-CFS
-
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
     A7BCD1420BFE778E \
@@ -227,11 +209,6 @@ echo "$VERSION_ARG" > /etc/version
 
 # Remove stub
 rm /usr/local/sbin/systemctl
-
-# Mask unneeded services
-systemctl mask watchdog-mux.service
-systemctl mask run-docker.sock.mount
-systemctl mask systemd-networkd-wait-online.service
 
 # Cleanup files
 rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
