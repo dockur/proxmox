@@ -63,14 +63,10 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
    - WSL kernel version 6.6+ (`wsl --version`)
    - Nested virtualization enabled in WSL Settings
 
-## Screenshots 📸
+## Screenshot 📸
 
 <div align="center">
 <a href="https://github.com/dockur/proxmox"><img src="https://raw.githubusercontent.com/dockur/proxmox/master/.github/screenshot.png" title="Screenshot" style="max-width:100%;" width="256" /></a>
-</div>
-
-<div align="center">
-<a href="https://github.com/dockur/proxmox"><img src="https://raw.githubusercontent.com/dockur/proxmox/master/.github/screenshot2.png" title="Screenshot" style="max-width:100%;" width="256" /></a>
 </div>
 
 ## FAQ 💬
