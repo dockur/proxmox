@@ -211,6 +211,7 @@ echo "$VERSION_ARG" > /etc/version
 
 # Remove stubs
 rm /usr/sbin/ifreload
+dpkg-divert --rename --remove /usr/sbin/ifreload
 rm /usr/local/sbin/systemctl
 
 # Cleanup files
