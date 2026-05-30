@@ -135,10 +135,6 @@ apt-get remove -y sudo os-prober
 apt-get autoremove -y
 apt-get clean
 
-# Mask unneeded services
-ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
-ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
-
 # Fix ifupdown2-pre.service for container (no udev)
 mkdir -p /etc/systemd/system/ifupdown2-pre.service.d
 cat > /etc/systemd/system/ifupdown2-pre.service.d/override.conf <<SRV
@@ -146,6 +142,14 @@ cat > /etc/systemd/system/ifupdown2-pre.service.d/override.conf <<SRV
 ExecStart=
 ExecStart=/bin/true
 SRV
+
+# Fix lxcfs.service to suppress error during shutdown
+mkdir -p /etc/systemd/system/lxcfs.service.d
+cat > /etc/systemd/system/lxcfs.service.d/override.conf <<CFS
+[Service]
+ExecStop=
+ExecStop=/bin/true
+CFS
 
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
@@ -213,6 +217,11 @@ echo "$VERSION_ARG" > /etc/version
 
 # Remove stub
 rm /usr/local/sbin/systemctl
+
+# Mask unneeded services
+systemctl mask watchdog-mux.service
+systemctl mask run-docker.sock.mount
+systemctl mask systemd-networkd-wait-online.service
 
 # Cleanup files
 rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
