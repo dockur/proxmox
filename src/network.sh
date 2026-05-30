@@ -42,6 +42,7 @@ configureDNS() {
   (( high < 254 )) && ranges+="dhcp-range=set:${fa},${base}.$((high + 1)),${base}.254"$'\n'
   ranges="${ranges%$'\n'}"  # strip trailing newline
 
+{
   cat <<EOF
 
     # Listen only on bridge
