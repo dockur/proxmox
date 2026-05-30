@@ -145,6 +145,14 @@ ExecStart=
 ExecStart=/bin/true
 SRV
 
+# Fix lxcfs.service to surpress error during shutdown
+mkdir -p /etc/systemd/system/lxcfs.service.d
+cat > /etc/systemd/system/lxcfs.service.d/override.conf <<CFS
+[Service]
+ExecStop=
+ExecStop=/bin/true
+CFS
+
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
     A7BCD1420BFE778E \
