@@ -66,7 +66,6 @@ configureDNS() {
     dhcp-option=vendor:MSFT,2,1i
 EOF
 
-  cat "$file" && sleep 5
   return 0
 }
 
@@ -109,7 +108,6 @@ EOF
     source /etc/network/interfaces.d/*
 EOF
 
-  cat "$file" && sleep 5
   return 0
 }
 
