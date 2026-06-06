@@ -79,10 +79,12 @@ touch /usr/share/doc/pve-manager/aplinfo.dat
 apt-get update
 apt-get full-upgrade -y
 apt-get install -y --no-install-recommends \
+  dbus \
   nano \
   wget \
   sudo \
   htop \
+  less \
   iotop \
   gnupg \
   procps \
@@ -92,6 +94,7 @@ apt-get install -y --no-install-recommends \
   dnsmasq \
   dnsutils \
   sysstat \
+  locales \
   iptables \
   iproute2 \
   ifupdown2 \
@@ -103,6 +106,9 @@ apt-get install -y --no-install-recommends \
   bridge-utils \
   iputils-ping \
   isc-dhcp-client
+
+# Generate locale
+locale-gen en_US.UTF-8
 
 # Remove enterprise repo added by Proxmox packages — keep only no-subscription
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
