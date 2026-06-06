@@ -146,6 +146,7 @@ Description=Keyboard Request Target
 KBR
 
 # Fix ifupdown2-pre.service for container (no udev)
+mkdir -p /etc/systemd/system/ifupdown2-pre.service.d
 cat >/etc/systemd/system/ifupdown2-pre.service.d/override.conf << IUD
 [Service]
 ExecStart=
