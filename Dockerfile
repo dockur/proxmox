@@ -85,6 +85,7 @@ apt-get install -y --no-install-recommends \
   sudo \
   htop \
   less \
+  cpio \
   iotop \
   gnupg \
   procps \
