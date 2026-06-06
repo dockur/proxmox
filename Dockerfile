@@ -133,7 +133,6 @@ apt-get clean
 
 # Mask unneeded services
 ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
-ln -sf /dev/null /etc/systemd/system/ifupdown2-pre.service
 ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
 
 # Disable keyboard request target (for Docker TTY)
@@ -143,6 +142,13 @@ Description=Keyboard Request Target
 
 [Target]
 KBR
+
+# Fix ifupdown2-pre.service for container (no udev)
+cat >/etc/systemd/system/ifupdown2-pre.service.d/override.conf << IUD
+[Service]
+ExecStart=
+ExecStart=/bin/true
+IUD
 
 # Add keyring for pveam
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
