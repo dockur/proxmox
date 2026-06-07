@@ -108,7 +108,7 @@ apt-get install -y --no-install-recommends \
   isc-dhcp-client
 
 # Install Proxmox VE
-apt-get install -y proxmox-ve
+apt-get install -y --no-install-recommends proxmox-ve
 
 # Remove enterprise repo added by Proxmox packages — keep only no-subscription
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
