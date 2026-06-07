@@ -108,9 +108,6 @@ apt-get install -y --no-install-recommends \
   iputils-ping \
   isc-dhcp-client
 
-# Generate locale
-locale-gen en_US.UTF-8
-
 # Remove enterprise repo added by Proxmox packages — keep only no-subscription
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
       /etc/apt/sources.list.d/pve-enterprise.sources \
@@ -131,6 +128,9 @@ apt-get remove -y os-prober >/dev/null
 SUDO_FORCE_REMOVE=yes apt-get remove -y sudo
 apt-get autoremove -y
 apt-get clean
+
+# Generate locale
+locale-gen en_US.UTF-8
 
 # Mask unneeded services
 ln -sf /dev/null /etc/systemd/system/watchdog-mux.service
