@@ -122,7 +122,7 @@ chown -R root:root "$dir"
 
 dir="/var/log/pveproxy"
 mkdir -p "$dir"
-chown -R "$user:$user" "$dir"
+chown -R www-data:www-data "$dir"
 
 echo "Booting Proxmox VE..."
 exec "$@"
