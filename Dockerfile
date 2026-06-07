@@ -37,7 +37,7 @@ if [[ "$TARGETARCH" == "amd64" ]]; then
   COMPONENT="pve-no-subscription"
 elif [[ "$TARGETARCH" == "arm64" ]]; then
   KEY_URL="https://mirrors.lierfang.com/pxcloud/lierfang.gpg"
-  KEY_PATH="/etc/apt/trusted.gpg.d/lierfang.gpg"
+  KEY_PATH="/usr/share/keyrings/lierfang.gpg"
   URI="https://mirrors.lierfang.com/pxcloud/pxvirt"
   SUITE="trixie"
   COMPONENT="main"
