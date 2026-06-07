@@ -71,7 +71,7 @@ if [ -n "$KVM_ERR" ]; then
   [[ "${DEBUG:-}" != [Yy1]* ]] && exit 19
 fi
 
-# Fix the timezone
+# If missing timezone and localtime set them
 set_timezone() {
   local zone="$1"
 
