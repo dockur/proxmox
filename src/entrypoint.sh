@@ -109,4 +109,20 @@ fi
 # Initialize network
 . network.sh
 
+echo "Updating directory permissions..."
+
+# Fix directory permissions
+dir="/var/lib/vz"
+mkdir -p "$dir"
+chown -R root:root "$dir"
+
+dir="/var/lib/pve-cluster"
+mkdir -p "$dir"
+chown -R root:root "$dir"
+
+dir="/var/log/pveproxy"
+mkdir -p "$dir"
+chown -R "$user:$user" "$dir"
+
+echo "Booting Proxmox VE..."
 exec "$@"
