@@ -109,9 +109,7 @@ fi
 # Initialize network
 . network.sh
 
-echo "Updating directory permissions..."
-
-# Fix directory permissions
+# Ensure directory permissions
 dir="/var/lib/vz"
 mkdir -p "$dir"
 chown root:root "$dir" || :
