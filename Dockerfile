@@ -21,12 +21,40 @@ set -Eeuo pipefail
 apt-get update
 
 # Install prerequisites
-apt-get --no-install-recommends -y install \
+apt-get update
+apt-get install -y --no-install-recommends \
   jq \
   curl \
-  ca-certificates
-apt-get clean
-rm -rf /var/lib/apt/lists/*
+  dbus \
+  nano \
+  wget \
+  sudo \
+  htop \
+  less \
+  cpio \
+  iotop \
+  gnupg \
+  procps \
+  chrony \
+  postfix \
+  ethtool \
+  dnsmasq \
+  dnsutils \
+  sysstat \
+  locales \
+  iptables \
+  iproute2 \
+  ifupdown2 \
+  net-tools \
+  nfs-common \
+  cifs-utils \
+  traceroute \
+  open-iscsi \
+  bridge-utils \
+  iputils-ping \
+  netcat-openbsd \
+  ca-certificates \
+  isc-dhcp-client
 
 # Add Proxmox archive keyring
 if [[ "$TARGETARCH" == "amd64" ]]; then
@@ -75,39 +103,8 @@ chmod +x /usr/local/sbin/systemctl
 mkdir -p /usr/share/doc/pve-manager
 touch /usr/share/doc/pve-manager/aplinfo.dat
 
-# Install prerequisite packages
-apt-get update
-apt-get full-upgrade -y
-apt-get install -y --no-install-recommends \
-  dbus \
-  nano \
-  wget \
-  sudo \
-  htop \
-  less \
-  cpio \
-  iotop \
-  gnupg \
-  procps \
-  chrony \
-  postfix \
-  ethtool \
-  dnsmasq \
-  dnsutils \
-  sysstat \
-  locales \
-  iptables \
-  iproute2 \
-  ifupdown2 \
-  net-tools \
-  nfs-common \
-  cifs-utils \
-  open-iscsi \
-  bridge-utils \
-  iputils-ping \
-  isc-dhcp-client
-
 # Install Proxmox VE
+apt-get update
 apt-get install -y --no-install-recommends proxmox-ve
 
 # Remove enterprise repo added by Proxmox packages — keep only no-subscription
