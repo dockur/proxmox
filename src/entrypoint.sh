@@ -114,15 +114,15 @@ echo "Updating directory permissions..."
 # Fix directory permissions
 dir="/var/lib/vz"
 mkdir -p "$dir"
-chown -R root:root "$dir"
+chown root:root "$dir"
 
 dir="/var/lib/pve-cluster"
 mkdir -p "$dir"
-chown -R root:root "$dir"
+chown root:root "$dir"
 
 dir="/var/log/pveproxy"
 mkdir -p "$dir"
-chown -R www-data:www-data "$dir"
+chown www-data:www-data "$dir"
 
 echo "Booting Proxmox VE..."
 exec "$@"
