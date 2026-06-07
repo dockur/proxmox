@@ -75,7 +75,7 @@ chmod +x /usr/local/sbin/systemctl
 mkdir -p /usr/share/doc/pve-manager
 touch /usr/share/doc/pve-manager/aplinfo.dat
 
-# Update system and install Proxmox VE
+# Install prerequisite packages
 apt-get update
 apt-get full-upgrade -y
 apt-get install -y --no-install-recommends \
@@ -102,11 +102,13 @@ apt-get install -y --no-install-recommends \
   net-tools \
   nfs-common \
   cifs-utils \
-  proxmox-ve \
   open-iscsi \
   bridge-utils \
   iputils-ping \
   isc-dhcp-client
+
+# Install Proxmox VE
+apt-get install -y proxmox-ve
 
 # Remove enterprise repo added by Proxmox packages — keep only no-subscription
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
