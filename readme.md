@@ -79,7 +79,7 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
   - Login using the username `root` and the password you specified in the `PASSWORD` environment variable.
   
-  Enjoy your time with your brand new Proxmox installation, and don't forget to star this repo!
+  Enjoy your time with your brand new Proxmox VE installation, and don't forget to star this repo!
 
 ### How do I change the location of the storage pool?
 
@@ -102,6 +102,10 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
   ```
 
   Replace the example path `./config` with the desired storage folder or named volume.
+
+### Are there containers available for other Proxmox products?
+
+  Yes, see our [Proxmox Backup Server](https://github.com/dockur/proxmox-backup)  and [Proxmox Datacenter Manager](https://github.com/dockur/proxmox-dm) containers.
 
 ### How do I verify if my system supports the KVM virtualization used by Proxmox?
 
