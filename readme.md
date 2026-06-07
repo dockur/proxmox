@@ -37,7 +37,7 @@ services:
     ports:
       - 8006:8006
     volumes:
-      - ./storage:/var/lib/vz
+      - ./data:/var/lib/vz
       - ./config:/var/lib/pve-cluster
     restart: always
     privileged: true
@@ -47,7 +47,7 @@ services:
 ##### Via Docker CLI:
 
 ```bash
-docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root" -p 8006:8006 -v "${PWD:-.}/storage:/var/lib/vz" -v "${PWD:-.}/config:/var/lib/pve-cluster" --stop-timeout 120 docker.io/dockurr/proxmox
+docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root" -p 8006:8006 -v "${PWD:-.}/data:/var/lib/vz" -v "${PWD:-.}/config:/var/lib/pve-cluster" --stop-timeout 120 docker.io/dockurr/proxmox
 ```
 
 ##### Via Github Codespaces:
@@ -87,10 +87,10 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
   ```yaml
   volumes:
-    - ./storage:/var/lib/vz
+    - ./data:/var/lib/vz
   ```
 
-  Replace the example path `./storage` with the desired storage folder or named volume.
+  Replace the example path `./data` with the desired storage folder or named volume.
 
 ### How do I change the location of the configuration data?
 
