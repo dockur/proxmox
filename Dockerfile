@@ -102,12 +102,11 @@ apt-get install -y --no-install-recommends \
   net-tools \
   nfs-common \
   cifs-utils \
+  proxmox-ve \
   open-iscsi \
   bridge-utils \
   iputils-ping \
   isc-dhcp-client
-
-apt-get install -y proxmox-ve
 
 # Generate locale
 locale-gen en_US.UTF-8
