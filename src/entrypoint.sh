@@ -71,6 +71,41 @@ if [ -n "$KVM_ERR" ]; then
   [[ "${DEBUG:-}" != [Yy1]* ]] && exit 19
 fi
 
+# Fix the timezone
+set_timezone() {
+  local zone="$1"
+
+  if [ ! -f "/usr/share/zoneinfo/$zone" ]; then
+    echo "Invalid timezone: $zone" >&2
+    exit 18
+  fi
+
+  ln -snf "/usr/share/zoneinfo/$zone" /etc/localtime
+  echo "$zone" > /etc/timezone
+}
+
+check_localtime() {
+  if [ ! -e /etc/localtime ] && [ ! -L /etc/localtime ]; then
+    return 1
+  fi
+
+  local target
+  target="$(readlink -f /etc/localtime 2>/dev/null || true)"
+
+  if [ -z "$target" ] || [ ! -f "$target" ] || [ ! -s "$target" ]; then
+    echo "Invalid TZ value." >&2
+    exit 1
+  fi
+
+  return 0
+}
+
+if [ -n "${TZ:-}" ]; then
+  set_timezone "$TZ"
+elif ! check_localtime; then
+  set_timezone "UTC"
+fi
+
 # Initialize network
 . network.sh
 
