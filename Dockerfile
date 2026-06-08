@@ -172,8 +172,8 @@ sed -i 's/^ConditionVirtualization=!container/#&/' /lib/systemd/system/lxcfs.ser
 echo "LISTEN_IP=\"0.0.0.0\"" >> /etc/default/pveproxy
 
 # Update PVE banner to display the IPv4 address
-sed -i "s|https://\${urlip}:8006/|http://localhost:8006|g" /usr/bin/pvebanner
-sed -i "s|https://\${localip}:8006/|http://localhost:8006|g" /usr/bin/pvebanner
+sed -i "s|https://\${urlip}:8006/|http://127.0.0.1:8006|g" /usr/bin/pvebanner
+sed -i "s|https://\${localip}:8006/|http://127.0.0.1:8006|g" /usr/bin/pvebanner
 sed -i "s|the Proxmox Virtual Environment\.|Proxmox for Docker v${VERSION_ARG}.|g" /usr/bin/pvebanner
 sed -i "s|the Pxvirt Powered by Lierfang\.|Proxmox for Docker v${VERSION_ARG}.|g" /usr/bin/pvebanner
 
