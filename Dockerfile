@@ -65,7 +65,7 @@ apt-get install -y --no-install-recommends \
 # Add Proxmox archive keyring
 if [[ "$TARGETARCH" == "amd64" ]]; then
   KEY_URL="https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg"
-  KEY _PATH="/usr/share/keyrings/proxmox-archive-keyring.gpg"
+  KEY_PATH="/usr/share/keyrings/proxmox-archive-keyring.gpg"
   URI="http://download.proxmox.com/debian/pve"
   SUITE="trixie"
   COMPONENT="pve-no-subscription"
