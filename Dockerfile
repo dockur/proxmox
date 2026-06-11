@@ -45,6 +45,7 @@ apt-get install -y --no-install-recommends \
   iptables \
   iproute2 \
   ifupdown2 \
+  e2fsprogs \
   net-tools \
   nfs-common \
   cifs-utils \
