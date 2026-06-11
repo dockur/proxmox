@@ -23,6 +23,7 @@ apt-get update
 # Install prerequisites
 apt-get update
 apt-get install -y --no-install-recommends \
+  bc \
   jq \
   curl \
   dbus \
@@ -45,12 +46,16 @@ apt-get install -y --no-install-recommends \
   iptables \
   iproute2 \
   ifupdown2 \
+  jfsutils \
+  xfsprogs \
   e2fsprogs \
   net-tools \
+  nfs-utils \
   nfs-common \
   cifs-utils \
   traceroute \
   open-iscsi \
+  btrfs-progs \
   bridge-utils \
   iputils-ping \
   netcat-openbsd \
@@ -60,7 +65,7 @@ apt-get install -y --no-install-recommends \
 # Add Proxmox archive keyring
 if [[ "$TARGETARCH" == "amd64" ]]; then
   KEY_URL="https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg"
-  KEY_PATH="/usr/share/keyrings/proxmox-archive-keyring.gpg"
+  KEY _PATH="/usr/share/keyrings/proxmox-archive-keyring.gpg"
   URI="http://download.proxmox.com/debian/pve"
   SUITE="trixie"
   COMPONENT="pve-no-subscription"
