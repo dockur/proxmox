@@ -29,7 +29,7 @@ jobs:
           while read -r v; do {
             [ -z "$latest_tag" ] || dpkg --compare-versions "$v" gt "$latest_tag"; } && latest_tag="$v"
           done < <(curl -fsSL http://download.proxmox.com/debian/pve/dists/trixie/pve-no-subscription/binary-amd64/Packages.gz | \
-                   gzip -dc | awk '/^Package: proxmox-backup-server$/ {f=1; next} f && /^Version:/ {print $2; f=0}')
+                   gzip -dc | awk '/^Package: pve-manager$/ {f=1; next} f && /^Version:/ {print $2; f=0}')
 
           latest_tag="${latest_tag%-*}"
           echo "Found tag: \"${latest_tag}\""
