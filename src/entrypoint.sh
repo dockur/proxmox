@@ -20,9 +20,6 @@ info "Starting Proxmox for Docker v$(</etc/version)..."
 info "For support visit https://github.com/dockur/proxmox"
 echo ""
 
-# Set shm size to 1G to prevent cluster joining issue
-mount -o remount,size=1G /dev/shm
-
 # Update password for root
 printf 'root:%s\n' "$PASSWORD" | chpasswd
 
@@ -70,6 +67,9 @@ if [ -n "$KVM_ERR" ]; then
   error "KVM acceleration is not available $KVM_ERR, see the FAQ for possible causes."
   [[ "${DEBUG:-}" != [Yy1]* ]] && exit 19
 fi
+
+# Set shm size to 1G to prevent cluster joining issue
+mount -o remount,size=1G /dev/shm
 
 # If missing timezone and localtime set them
 set_timezone() {
