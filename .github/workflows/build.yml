@@ -25,14 +25,18 @@ jobs:
         name: Get remote package data
         run: |
           set -e -o pipefail
-          latest_tag=$(curl -fsSL https://metadata.cdn.proxmox.com/download/changelogs/pve/dists/trixie/pve-no-subscription/p/pve-manager/ | grep -oP 'pve-manager_\K[0-9]+\.[0-9]+\.[0-9]+(?=\.changelog)' | sort -V | tail -1)
+          latest_tag=""; 
+          while read -r v; do {
+            [ -z "$latest_tag" ] || dpkg --compare-versions "$v" gt "$latest_tag"; } && latest_tag="$v"
+          done < <(curl -fsSL http://download.proxmox.com/debian/pve/dists/trixie/pve-no-subscription/binary-amd64/Packages.gz | \
+                   gzip -dc | awk '/^Package: proxmox-backup-server$/ {f=1; next} f && /^Version:/ {print $2; f=0}')
+
+          latest_tag="${latest_tag%-*}"
           echo "Found tag: \"${latest_tag}\""
-          latest_version="${latest_tag%-*}"
-          major="${latest_version%%.*}"
-          minor="${latest_version#*.}"
+          major="${latest_tag%%.*}"
+          minor="${latest_tag#*.}"
           minor="${minor%%.*}"
           echo "latest_tag=$latest_tag" >> $GITHUB_ENV
-          echo "latest_version=$latest_version" >> $GITHUB_ENV
           echo "latest_minor=$major.$minor" >> $GITHUB_ENV
           echo "latest_major=$major" >> $GITHUB_ENV
       - 
@@ -67,7 +71,7 @@ jobs:
             type=raw,value=latest,priority=100
             type=raw,value=${{ env.latest_major }},priority=250
             type=raw,value=${{ env.latest_minor }},priority=350
-            type=raw,value=${{ env.latest_version }},priority=450
+            type=raw,value=${{ env.latest_tag }},priority=450
           labels: |
             org.opencontainers.image.title=${{ vars.NAME }}
         env:
