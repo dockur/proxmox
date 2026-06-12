@@ -54,15 +54,6 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/dockur/proxmox)
 
-## Requirements 🛠️
-
-- Intel VT-x / AMD-V enabled
-- Modern Linux host with kernel 6.8+
-- [Docker Engine](https://docs.docker.com/engine/install/) (version 27+ recommended)
-- Windows 11 with Docker Desktop (WSL2):
-   - WSL kernel version 6.6+ (`wsl --version`)
-   - Nested virtualization enabled in WSL Settings
-
 ## Screenshot 📸
 
 <div align="center">
