@@ -129,7 +129,7 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 Special thanks to [rtedpro-cpu](https://github.com/rtedpro-cpu) and [LongQT-sea](https://github.com/LongQT-sea), this project would not exist without their invaluable work.
 
 ## Stars 🌟
-[![Stars](https://starchart.cc/dockur/proxmox.svg?variant=adaptive)](https://starchart.cc/dockur/proxmox)
+[![Stargazers](https://raw.githubusercontent.com/star-stats/stars/refs/heads/data/charts/dockur-proxmox.svg)](https://github.com/dockur/proxmox/stargazers)
 
 [build_url]: https://github.com/dockur/proxmox/
 [hub_url]: https://hub.docker.com/r/dockurr/proxmox/
