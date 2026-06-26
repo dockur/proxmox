@@ -7,6 +7,7 @@
 [![Build]][build_url]
 [![Version]][tag_url]
 [![Size]][tag_url]
+[![Package]][pkg_url]
 [![Pulls]][hub_url]
 
 </div></h1>
