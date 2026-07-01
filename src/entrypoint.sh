@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Docker environment variables
-: "${DEBUG:="N"}"            # Enable shell debugging
+: "${DEBUG:="N"}"            # Enable debugging
 : "${PASSWORD:="root"}"      # Default password
 : "${REQUIRE_KVM:="Y"}"      # Require /dev/kvm by default
 : "${REQUIRE_FUSE:="Y"}"     # Require /dev/fuse by default
