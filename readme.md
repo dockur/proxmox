@@ -132,6 +132,10 @@ Special thanks to [rtedpro-cpu](https://github.com/rtedpro-cpu) and [LongQT-sea]
 ## Stars 🌟
 [![Stargazers](https://raw.githubusercontent.com/star-stats/stars/refs/heads/data/charts/dockur-proxmox.svg)](https://github.com/dockur/proxmox/stargazers)
 
+## Disclaimer ⚖️
+
+*The product names, logos, brands, and other trademarks referred to within this project are the property of their respective trademark holders. This project is not affiliated, sponsored, or endorsed by Proxmox Server Solutions Gmbh.*
+
 [build_url]: https://github.com/dockur/proxmox/
 [hub_url]: https://hub.docker.com/r/dockurr/proxmox/
 [tag_url]: https://hub.docker.com/r/dockurr/proxmox/tags
