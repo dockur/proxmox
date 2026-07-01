@@ -260,7 +260,7 @@ fi
 # Initialize network unless disabled.
 if ! is_enabled "$SKIP_NETWORK"; then
   require_file "/usr/local/bin/network.sh"
-  # shellcheck source=/usr/local/bin/network.sh
+  # shellcheck source=src/network.sh
   . /usr/local/bin/network.sh
 else
   warn "Skipping network initialization because SKIP_NETWORK=Y."
