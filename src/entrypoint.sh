@@ -135,11 +135,11 @@ check_systemd_command() {
   fi
 
   case "$1" in
-    /sbin/init|/lib/systemd/systemd|systemd|init)
+    /sbin/init|/lib/systemd/systemd|/usr/lib/systemd/systemd|systemd|init)
       return 0
       ;;
     *)
-      warn "Container command is '$1'. For Proxmox VE this should usually be systemd, for example: /sbin/init"
+      warn "Container command is '$*'. For Proxmox VE this should usually be systemd, for example: /sbin/init"
       ;;
   esac
 }
