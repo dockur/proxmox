@@ -2,12 +2,11 @@
 set -Eeuo pipefail
 
 # Docker environment variables
-: "${DEBUG:="N"}"            # Enable shell debugging with DEBUG=Y
+: "${DEBUG:="N"}"            # Enable shell debugging
 : "${PASSWORD:="root"}"      # Default password
 : "${REQUIRE_KVM:="Y"}"      # Require /dev/kvm by default
 : "${REQUIRE_FUSE:="Y"}"     # Require /dev/fuse by default
 : "${SHM_SIZE:="1G"}"        # Remount /dev/shm to this size
-: "${SKIP_NETWORK:="N"}"     # Skip network.sh with SKIP_NETWORK=Y
 
 # Helper functions
 info () { printf "%b%s%b" "\E[1;34m❯ \E[1;36m" "${1:-}" "\E[0m\n"; }
@@ -20,10 +19,6 @@ is_enabled() {
     *) return 1 ;;
   esac
 }
-
-if is_enabled "$DEBUG"; then
-  set -x
-fi
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -257,14 +252,9 @@ elif ! check_localtime; then
   set_timezone "UTC"
 fi
 
-# Initialize network unless disabled.
-if ! is_enabled "$SKIP_NETWORK"; then
-  require_file "/usr/local/bin/network.sh"
-  # shellcheck source=src/network.sh
-  . /usr/local/bin/network.sh
-else
-  warn "Skipping network initialization because SKIP_NETWORK=Y."
-fi
+# Initialize network
+# shellcheck source=src/network.sh
+. /usr/local/bin/network.sh
 
 # Ensure directory permissions.
 prepare_directory "/var/lib/vz" "root:root" "0755"
@@ -280,11 +270,6 @@ prepare_directory "/run/lock/lxc" "root:root" "0755"
 
 # Remove stale runtime files from unclean container stops.
 cleanup_stale_runtime_files
-
-# Give some diagnostics that help with Docker/systemd failures.
-if [ ! -S /run/systemd/private ] && [ -d /run/systemd ]; then
-  warn "systemd is not running yet. This is expected before exec, but should exist after PID 1 starts."
-fi
 
 echo "Booting Proxmox VE..."
 exec "$@"
