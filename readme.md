@@ -97,7 +97,7 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
 ### Are there containers available for other Proxmox products?
 
-  Yes, see our [Proxmox Backup Server](https://github.com/dockur/proxmox-backup) and [Proxmox Datacenter Manager](https://github.com/dockur/proxmox-dm) containers.
+  Yes, see our [Proxmox Backup Server](https://github.com/dockur/proxmox-backup), [Proxmox Datacenter Manager](https://github.com/dockur/proxmox-dm) and [Proxmox Mail Gateway](https://github.com/dockur/proxmox-mail) containers.
 
 ### How do I verify if my system supports the KVM virtualization used by Proxmox?
 
