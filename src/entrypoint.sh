@@ -43,7 +43,7 @@ continue_or_exit() {
   local code="$1"
 
   if is_enabled "$DEBUG"; then
-    warn "DEBUG=Y is set, continuing despite previous error."
+    warn "DEBUG is enabled (DEBUG=${DEBUG}), continuing despite previous error."
     return 0
   fi
 
