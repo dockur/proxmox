@@ -134,7 +134,7 @@ Special thanks to [rtedpro-cpu](https://github.com/rtedpro-cpu) and [LongQT-sea]
 
 ## Disclaimer ⚖️
 
-*The product names, logos, brands, and other trademarks referred to within this project are the property of their respective trademark holders. This project is not affiliated, sponsored, or endorsed by Proxmox Server Solutions Gmbh.*
+*The product names, logos, brands, and other trademarks referred to within this project are the property of their respective trademark holders. This project is not affiliated, sponsored, or endorsed by Proxmox Server Solutions GmbH.*
 
 [build_url]: https://github.com/dockur/proxmox/
 [hub_url]: https://hub.docker.com/r/dockurr/proxmox/
