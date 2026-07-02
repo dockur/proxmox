@@ -132,7 +132,7 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
   - you enabled "nested virtualization" if you are running the container inside a virtual machine.
 
-  - you are not using a cloud provider, as most of them do not allow nested virtualization for their VPS's.
+  - you are not using a cloud provider, as most of them do not allow nested virtualization for their VPSs.
 
 ## Acknowledgements 🙏
 
