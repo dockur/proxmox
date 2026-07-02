@@ -16,12 +16,12 @@ Proxmox VE inside a Docker container.
 
 ## Features ✨
 
-- **High-performance** — Identically to bare-metal thanks to KVM acceleration
-- **Fast iteration** — Spin up or tear down a PVE node quickly within seconds
-- **Easy backups** — Stores all your configuration in a volume mount
-- **Simple networking** — Comes with a pre-configured NAT bridge with DHCP
-- **LXC supported** — LXC containers work out of the box
-- **Multi-platform** — Support for ARM64 processors via PXVIRT
+ - **High-performance** — Identically to bare-metal thanks to KVM acceleration
+ - **Fast iteration** — Spin up or tear down a PVE node quickly within seconds
+ - **Easy backups** — Stores all your configuration in a volume mount
+ - **Simple networking** — Comes with a pre-configured NAT bridge with DHCP
+ - **LXC supported** — LXC containers work out of the box
+ - **Multi-platform** — Support for ARM64 processors via PXVIRT
 
 ## Usage  🐳
 
@@ -63,9 +63,9 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
 ## Requirements ⚙️
 
-- A Linux host with KVM support, or Docker Desktop / Podman on Windows 11 with nested virtualization enabled.
-- At least 2 GB of RAM available.
-- At least 32 GB of free disk space.
+ - A Linux host with KVM support, or Docker Desktop / Podman on Windows 11 with nested virtualization enabled.
+ - At least 2 GB of RAM available.
+ - At least 32 GB of free disk space.
 
 > [!NOTE]
 > Docker Desktop on macOS and Windows 10 do not currently provide the required KVM support for this image.
