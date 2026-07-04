@@ -18,7 +18,6 @@ RUN <<EOF
 
 # Break on errors
 set -Eeuo pipefail
-apt-get update
 
 # Install prerequisites
 apt-get update
