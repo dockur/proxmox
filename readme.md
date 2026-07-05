@@ -16,12 +16,12 @@ Proxmox VE inside a Docker container.
 
 ## Features ✨
 
- - **High-performance** — Identically to bare-metal thanks to KVM acceleration
- - **Fast iteration** — Spin up or tear down a PVE node quickly within seconds
- - **Easy backups** — Stores all your configuration in a volume mount
- - **Simple networking** — Comes with a pre-configured NAT bridge with DHCP
- - **LXC supported** — LXC containers work out of the box
- - **Multi-platform** — Support for ARM64 processors via PXVIRT
+- Runs a full Proxmox VE node inside Docker
+- Provides the familiar Proxmox web interface
+- Supports fast KVM-accelerated virtual machines
+- Supports LXC containers out of the box
+- Includes a pre-configured NAT bridge with DHCP
+- Supports ARM64 systems through PXVIRT
 
 ## Usage  🐳
 
