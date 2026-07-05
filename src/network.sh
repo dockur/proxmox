@@ -16,6 +16,51 @@ ADD_ERR="Please add the following setting to your container:"
 #  Functions
 # ######################################
 
+getMTU() {
+
+  local dev="$1"
+
+  if [ -r "/sys/class/net/$dev/mtu" ]; then
+    cat "/sys/class/net/$dev/mtu"
+  else
+    echo "0"
+  fi
+
+  return 0
+}
+
+minMTU() {
+
+  local mtu=""
+  local min=""
+
+  for mtu in "$@"; do
+    [[ -z "$mtu" || "$mtu" == "0" ]] && continue
+
+    if [[ -z "$min" || "$mtu" -lt "$min" ]]; then
+      min="$mtu"
+    fi
+  done
+
+  echo "${min:-0}"
+  return 0
+}
+
+setMTU() {
+
+  local dev="$1"
+  local mtu="$2"
+
+  # MTU 0 means "do not set"; MTU 1500 is the normal default and does not need setting.
+  [[ "$mtu" == "0" || "$mtu" == "1500" ]] && return 0
+
+  if ! ip link set dev "$dev" mtu "$mtu"; then
+    warn "failed to set MTU size of $dev to $mtu."
+  fi
+
+  return 0
+}
+
 configureDNS() {
 
   local fa="$1"
@@ -56,6 +101,8 @@ configureDNS() {
     dhcp-option=option:netmask,$mask
     dhcp-option=option:router,$gateway
     dhcp-option=option:dns-server,$gateway
+    dhcp-option=option:interface-mtu,$GUEST_MTU
+    
     address=/host.lan/$gateway
 
     # DHCP settings
@@ -173,7 +220,7 @@ configureNAT() {
     fi
   fi
 
-  local ip base gateway
+  local ip base
   base=$(cut -d. -f3,4 <<< "$IP")
 
   if [[ "$IP" != "172.30."* ]]; then
@@ -182,20 +229,25 @@ configureNAT() {
     ip="172.31.$base"
   fi
 
-  if [[ "$ip" != *".1" ]]; then
-    gateway="${ip%.*}.1"
-  else
-    gateway="${ip%.*}.2"
+  local last="${ip##*.}"
+
+  if [[ ! "$last" =~ ^[0-9]+$ ]] || (( last < 2 || last > 254 )); then
+    ip="${ip%.*}.4"
   fi
 
+  local gateway="${ip%.*}.1"
   local subnet="${ip%.*}.0/24"
   local broadcast="${ip%.*}.255"
 
-  # Create a bridge with a static IP for the VM guests
-  { ip link add dev "$BRIDGE" type bridge ; rc=$?; } || :
+  # Create a bridge with a static IP for the VM guest
+  { ip link add dev "$BRIDGE" type bridge; rc=$?; } || :
 
   if (( rc != 0 )); then
     error "failed to create bridge. $ADD_ERR --cap-add NET_ADMIN" && return 1
+  fi
+
+  if [[ "$GUEST_MTU" != "0" ]]; then
+    setMTU "$BRIDGE" "$GUEST_MTU"
   fi
 
   if ! ip address add "$gateway/24" broadcast "$broadcast" dev "$BRIDGE"; then
@@ -212,10 +264,8 @@ configureNAT() {
     error "$tuntap" && return 1
   fi
 
-  if [[ "$MTU" != "0" && "$MTU" != "1500" ]]; then
-    if ! ip link set dev "$TAP" mtu "$MTU"; then
-      warn "failed to set MTU size to $MTU."
-    fi
+  if [[ "$GUEST_MTU" != "0" ]]; then
+    setMTU "$TAP" "$GUEST_MTU"
   fi
 
   if ! ip link set dev "$TAP" address "$GATEWAY_MAC"; then
@@ -231,21 +281,65 @@ configureNAT() {
     error "failed to set master bridge!" && return 1
   fi
 
+  # Use the lowest effective guest-facing MTU, without mutating the parent/uplink MTU.
+  if [[ "$GUEST_MTU" != "0" ]]; then
+    GUEST_MTU=$(minMTU "$GUEST_MTU" "$(getMTU "$BRIDGE")" "$(getMTU "$VM_NET_TAP")")
+  fi
+
   # Flush existing tables
   clearTables
 
   # NAT traffic from bridge subnet to Docker uplink
-  if ! iptables -t nat -A POSTROUTING -o "$DEV" -s "$subnet" ! -d "$subnet" -m comment --comment "remove" -j MASQUERADE; then
+  if ! iptables -t nat -A POSTROUTING \
+    -o "$DEV" \
+    -s "$subnet" \
+    ! -d "$subnet" \
+    -m comment --comment "remove" \
+    -j MASQUERADE; then
     error "$tables" && return 1
   fi
 
+  if (( KERNEL > 4 )); then
+    # Hack for guest VMs complaining about "bad udp checksums in 5 packets"
+    iptables -t mangle -A POSTROUTING \
+      -s "$subnet" \
+      -p udp \
+      --dport bootpc \
+      -m comment --comment "remove" \
+      -j CHECKSUM --checksum-fill > /dev/null 2>&1 || true
+  fi
+
+  # Clamp TCP MSS to avoid subtle MTU blackholes when the outer path has a smaller MTU.
+  iptables -t mangle -A FORWARD \
+    -s "$subnet" \
+    -p tcp \
+    --tcp-flags SYN,RST SYN \
+    -m comment --comment "remove" \
+    -j TCPMSS --clamp-mss-to-pmtu > /dev/null 2>&1 || true
+
+  iptables -t mangle -A FORWARD \
+    -d "$ip" \
+    -p tcp \
+    --tcp-flags SYN,RST SYN \
+    -m comment --comment "remove" \
+    -j TCPMSS --clamp-mss-to-pmtu > /dev/null 2>&1 || true
+
   # Allow forwarding from bridge -> dev
-  if ! iptables -A FORWARD -i "$BRIDGE" -o "$DEV" -m comment --comment "remove" -j ACCEPT; then
+  if ! iptables -A FORWARD \
+    -i "$BRIDGE" \
+    -o "$DEV" \
+    -m comment --comment "remove" \
+    -j ACCEPT; then
     error "failed to configure IP tables!" && return 1
   fi
 
   # Allow return traffic
-  if ! iptables -A FORWARD -i "$DEV" -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "remove" -j ACCEPT; then
+  if ! iptables -A FORWARD \
+    -i "$DEV" \
+    -o "$BRIDGE" \
+    -m conntrack --ctstate RELATED,ESTABLISHED \
+    -m comment --comment "remove" \
+    -j ACCEPT; then
     error "failed to configure IP tables!" && return 1
   fi
 
@@ -316,14 +410,23 @@ getInfo() {
     exit 29
   fi
 
-  local mac mtu=""
+  local mac mtu="" mtu_custom="N"
 
   if [ -f "/sys/class/net/$DEV/mtu" ]; then
     mtu=$(< "/sys/class/net/$DEV/mtu")
   fi
 
+  [ -n "$MTU" ] && mtu_custom="Y"
   [ -z "$MTU" ] && MTU="$mtu"
   [ -z "$MTU" ] && MTU="0"
+
+  GUEST_MTU="$MTU"
+
+  # Automatically propagate smaller-than-standard MTUs, but do not automatically
+  # advertise jumbo frames unless the user explicitly requested MTU.
+  if [[ "$GUEST_MTU" != "0" && "$GUEST_MTU" -gt "1500" ]] && ! enabled "$mtu_custom"; then
+    GUEST_MTU="1500"
+  fi
 
   # Generate MAC address based on Docker container ID in hostname
   HOST="$(hostname -s)"
