@@ -71,13 +71,20 @@ configureDNS() {
   local ip_last="${ip##*.}"
   local gw_last="${gateway##*.}"
   local file="/etc/dnsmasq.d/$fa.conf"
+  local mtu_option=""
+
+  if [[ "$LAN_MTU" != "0" && "$LAN_MTU" != "1500" ]]; then
+    mtu_option="dhcp-option=option:interface-mtu,$LAN_MTU"
+  fi
 
   # Determine the sorted positions
   local low high
   if (( ip_last < gw_last )); then
-    low=$ip_last; high=$gw_last
+    low=$ip_last
+    high=$gw_last
   else
-    low=$gw_last; high=$ip_last
+    low=$gw_last
+    high=$ip_last
   fi
 
   # Build dhcp-range lines
@@ -101,8 +108,8 @@ configureDNS() {
     dhcp-option=option:netmask,$mask
     dhcp-option=option:router,$gateway
     dhcp-option=option:dns-server,$gateway
-    dhcp-option=option:interface-mtu,$GUEST_MTU
-    
+    $mtu_option
+
     address=/host.lan/$gateway
 
     # DHCP settings
@@ -239,15 +246,15 @@ configureNAT() {
   local subnet="${ip%.*}.0/24"
   local broadcast="${ip%.*}.255"
 
-  # Create a bridge with a static IP for the VM guest
+  # Create a bridge with a static IP for the VM LAN
   { ip link add dev "$BRIDGE" type bridge; rc=$?; } || :
 
   if (( rc != 0 )); then
     error "failed to create bridge. $ADD_ERR --cap-add NET_ADMIN" && return 1
   fi
 
-  if [[ "$GUEST_MTU" != "0" ]]; then
-    setMTU "$BRIDGE" "$GUEST_MTU"
+  if [[ "$LAN_MTU" != "0" ]]; then
+    setMTU "$BRIDGE" "$LAN_MTU"
   fi
 
   if ! ip address add "$gateway/24" broadcast "$broadcast" dev "$BRIDGE"; then
@@ -264,8 +271,8 @@ configureNAT() {
     error "$tuntap" && return 1
   fi
 
-  if [[ "$GUEST_MTU" != "0" ]]; then
-    setMTU "$TAP" "$GUEST_MTU"
+  if [[ "$LAN_MTU" != "0" ]]; then
+    setMTU "$TAP" "$LAN_MTU"
   fi
 
   if ! ip link set dev "$TAP" address "$GATEWAY_MAC"; then
@@ -281,9 +288,9 @@ configureNAT() {
     error "failed to set master bridge!" && return 1
   fi
 
-  # Use the lowest effective guest-facing MTU, without mutating the parent/uplink MTU.
-  if [[ "$GUEST_MTU" != "0" ]]; then
-    GUEST_MTU=$(minMTU "$GUEST_MTU" "$(getMTU "$BRIDGE")" "$(getMTU "$VM_NET_TAP")")
+  # Use the lowest effective VM-LAN MTU, without mutating the parent/uplink MTU.
+  if [[ "$LAN_MTU" != "0" ]]; then
+    LAN_MTU=$(minMTU "$LAN_MTU" "$(getMTU "$BRIDGE")" "$(getMTU "$TAP")")
   fi
 
   # Flush existing tables
@@ -312,13 +319,6 @@ configureNAT() {
   # Clamp TCP MSS to avoid subtle MTU blackholes when the outer path has a smaller MTU.
   iptables -t mangle -A FORWARD \
     -s "$subnet" \
-    -p tcp \
-    --tcp-flags SYN,RST SYN \
-    -m comment --comment "remove" \
-    -j TCPMSS --clamp-mss-to-pmtu > /dev/null 2>&1 || true
-
-  iptables -t mangle -A FORWARD \
-    -d "$ip" \
     -p tcp \
     --tcp-flags SYN,RST SYN \
     -m comment --comment "remove" \
@@ -420,12 +420,12 @@ getInfo() {
   [ -z "$MTU" ] && MTU="$mtu"
   [ -z "$MTU" ] && MTU="0"
 
-  GUEST_MTU="$MTU"
+  LAN_MTU="$MTU"
 
   # Automatically propagate smaller-than-standard MTUs, but do not automatically
   # advertise jumbo frames unless the user explicitly requested MTU.
-  if [[ "$GUEST_MTU" != "0" && "$GUEST_MTU" -gt "1500" ]] && ! enabled "$mtu_custom"; then
-    GUEST_MTU="1500"
+  if [[ "$LAN_MTU" != "0" && "$LAN_MTU" -gt "1500" ]] && ! enabled "$mtu_custom"; then
+    LAN_MTU="1500"
   fi
 
   # Generate MAC address based on Docker container ID in hostname
