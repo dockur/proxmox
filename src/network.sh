@@ -77,6 +77,10 @@ configureDNS() {
     mtu_option="dhcp-option=option:interface-mtu,$LAN_MTU"
   fi
 
+  # Reserve both the bridge gateway address and the translated container address.
+  # The translated address is intentionally excluded from DHCP so it can be used
+  # later as a stable container/host identity inside the VM subnet.
+
   # Determine the sorted positions
   local low high
   if (( ip_last < gw_last )); then
@@ -324,19 +328,19 @@ configureNAT() {
     -m comment --comment "remove" \
     -j TCPMSS --clamp-mss-to-pmtu > /dev/null 2>&1 || true
 
-  # Allow forwarding from bridge -> dev
+  # Allow outbound traffic from the Proxmox VM subnet to the Docker uplink.
   if ! iptables -A FORWARD \
-    -i "$BRIDGE" \
+    -s "$subnet" \
     -o "$DEV" \
     -m comment --comment "remove" \
     -j ACCEPT; then
     error "failed to configure IP tables!" && return 1
   fi
 
-  # Allow return traffic
+  # Allow return traffic from the Docker uplink back to the Proxmox VM subnet.
   if ! iptables -A FORWARD \
+    -d "$subnet" \
     -i "$DEV" \
-    -o "$BRIDGE" \
     -m conntrack --ctstate RELATED,ESTABLISHED \
     -m comment --comment "remove" \
     -j ACCEPT; then
