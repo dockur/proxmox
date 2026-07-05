@@ -61,6 +61,19 @@ setMTU() {
   return 0
 }
 
+disableIPv6() {
+
+  local dev="$1"
+
+  [ -d "/proc/sys/net/ipv6/conf/$dev" ] || return 0
+
+  # Best-effort only: Docker/rootless/container sysctl writes can fail.
+  sysctl -w "net.ipv6.conf.$dev.disable_ipv6=1" > /dev/null 2>&1 || :
+  sysctl -w "net.ipv6.conf.$dev.accept_ra=0" > /dev/null 2>&1 || :
+
+  return 0
+}
+
 configureDNS() {
 
   local fa="$1"
@@ -72,9 +85,15 @@ configureDNS() {
   local gw_last="${gateway##*.}"
   local file="/etc/dnsmasq.d/$fa.conf"
   local mtu_option=""
+  local filter_dns=""
 
   if [[ "$LAN_MTU" != "0" && "$LAN_MTU" != "1500" ]]; then
     mtu_option="dhcp-option=option:interface-mtu,$LAN_MTU"
+  fi
+
+  # Avoid returning IPv6 records when the active network mode is IPv4-only.
+  if [[ "${NETWORK,,}" == "tap" || "${NETWORK,,}" == "tun" || "${NETWORK,,}" == "tuntap" || "${NETWORK,,}" == "y" || -z "$IP6" ]]; then
+    filter_dns="filter-AAAA"
   fi
 
   # Reserve both the bridge gateway address and the translated container address.
@@ -115,6 +134,7 @@ configureDNS() {
     $mtu_option
 
     address=/host.lan/$gateway
+    $filter_dns
 
     # DHCP settings
     dhcp-authoritative
@@ -270,6 +290,9 @@ configureNAT() {
     sleep 2
   done
 
+  # NAT networking is IPv4-only; disable IPv6 on the VM bridge if possible.
+  disableIPv6 "$BRIDGE"
+
   # Set tap to the bridge created
   if ! ip tuntap add dev "$TAP" mode tap; then
     error "$tuntap" && return 1
@@ -287,6 +310,9 @@ configureNAT() {
     info "Waiting for TAP to become available..."
     sleep 2
   done
+
+  # NAT networking is IPv4-only; disable IPv6 on the VM tap if possible.
+  disableIPv6 "$TAP"
 
   if ! ip link set dev "$TAP" master "$BRIDGE"; then
     error "failed to set master bridge!" && return 1
