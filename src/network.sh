@@ -372,16 +372,6 @@ configureTables() {
     error "$tables" && return 1
   fi
 
-  if (( KERNEL > 4 )); then
-    # Hack for guest VMs complaining about "bad udp checksums in 5 packets"
-    iptables -t mangle -A POSTROUTING \
-      -s "$subnet" \
-      -p udp \
-      --dport bootpc \
-      -m comment --comment "$rule_tag" \
-      -j CHECKSUM --checksum-fill > /dev/null 2>&1 || true
-  fi
-
   # Clamp TCP MSS to avoid subtle MTU blackholes when the outer path has a smaller MTU.
   iptables -t mangle -A FORWARD \
     -s "$subnet" \
@@ -443,6 +433,11 @@ configureNAT() {
   container_ip=$(containerIP "$IP")
   gateway="${container_ip%.*}.1"
   subnet=$(networkCIDR "$container_ip") || return 1
+
+  if ip route show "$subnet" 2>/dev/null | grep -q .; then
+    error "VM subnet $subnet conflicts with an existing route inside the container."
+    return 1
+  fi
 
   createBridge "$gateway" || return 1
   createTap "$tuntap" || return 1
