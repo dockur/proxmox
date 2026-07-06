@@ -519,6 +519,12 @@ configureNAT() {
   fi
 
   createBridge "$gateway" || return 1
+
+  if ! ip address add "$container_ip/$PREFIX" dev "$BRIDGE"; then
+    error "failed to add container IP address to bridge!"
+    return 1
+  fi
+
   createTap "$tuntap" || return 1
 
   # Use the lowest effective VM-LAN MTU, without mutating the parent/uplink MTU.
