@@ -36,30 +36,6 @@ isNAT() {
   esac
 }
 
-subnetBase() {
-
-  local ip="$1"
-  local third=""
-  local second=""
-  local base=""
-  local subnet=""
-
-  third=$(cut -d. -f3 <<< "$ip")
-
-  for second in {30..254}; do
-    base="172.$second.$third"
-    subnet="$base.0/$PREFIX"
-
-    if ! ip route show "$subnet" 2>/dev/null | grep -q .; then
-      echo "$base"
-      return 0
-    fi
-  done
-
-  error "No available VM subnet found in 172.30.$third.0/$PREFIX through 172.254.$third.0/$PREFIX."
-  return 1
-}
-
 maskToCIDR() {
 
   local mask="$1"
@@ -225,6 +201,30 @@ disableIPv6() {
   sysctl -w "net.ipv6.conf.$dev.accept_ra=0" > /dev/null 2>&1 || :
 
   return 0
+}
+
+subnetBase() {
+
+  local ip="$1"
+  local third=""
+  local second=""
+  local base=""
+  local subnet=""
+
+  third=$(cut -d. -f3 <<< "$ip")
+
+  for second in {30..254}; do
+    base="172.$second.$third"
+    subnet="$base.0/$PREFIX"
+
+    if ! ip route show "$subnet" 2>/dev/null | grep -q .; then
+      echo "$base"
+      return 0
+    fi
+  done
+
+  error "No available VM subnet found in 172.30.$third.0/$PREFIX through 172.254.$third.0/$PREFIX."
+  return 1
 }
 
 # ######################################
@@ -512,6 +512,7 @@ configureNAT() {
 # ######################################
 
 clearTables() {
+
   local table="" line rules
   local rule_tag="remove"
   local re="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
