@@ -16,6 +16,20 @@ ADD_ERR="Please add the following setting to your container:"
 #  Generic helpers
 # ######################################
 
+enabled() {
+  case "$(strip "${1:-}")" in
+    Y|y|YES|Yes|yes|TRUE|True|true|1|ON|On|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+disabled() {
+  case "$(strip "${1:-}")" in
+    N|n|NO|No|no|FALSE|False|false|0|OFF|Off|off) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 isNAT() {
 
   case "${NETWORK,,}" in
@@ -335,7 +349,7 @@ configureNAT() {
   local tuntap="TUN device is missing. $ADD_ERR --device /dev/net/tun"
   local rc
 
-  [[ "$DEBUG" == [Yy1]* ]] && echo "Configuring NAT networking..."
+  enabled "$DEBUG" && echo "Configuring NAT networking..."
 
   # Create the necessary file structure for /dev/net/tun
   if [ ! -c /dev/net/tun ]; then
@@ -513,7 +527,7 @@ getInfo() {
   mac=$(echo "$HOST" | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
   GATEWAY_MAC=$(echo "${mac^^}" | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
 
-  if [[ "$DEBUG" == [Yy1]* ]]; then
+  if enabled "$DEBUG"; then
     line="Host: $HOST  IP: $IP  Gateway: $GATEWAY  Interface: $DEV  MTU: $mtu"
     [[ "$MTU" != "0" && "$MTU" != "$mtu" ]] && line+=" ($MTU)"
     info "$line"
@@ -542,10 +556,10 @@ blockLicense() {
 
 blockLicense
 
-[[ "$NETWORK" == [Nn]* ]] && return 0
+disabled "$NETWORK" && return 0
 
 msg="Initializing network..."
-[[ "$DEBUG" == [Yy1]* ]] && info "$msg"
+enabled "$DEBUG" && info "$msg"
 
 getInfo
 closeBridge
@@ -559,7 +573,7 @@ if ! configureNAT; then
 
 else
 
-  [[ "$DEBUG" == [Yy1]* ]] && info "Initialized network successfully..."
+  enabled "$DEBUG" && info "Initialized network successfully..."
 
 fi
 
