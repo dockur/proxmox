@@ -10,25 +10,19 @@ set -Eeuo pipefail
 : "${BRIDGE:="vmbr0"}"
 : "${MASK:="255.255.255.0"}"
 
+# Sanitize variables
+DEV=$(strip "$DEV")
+MTU=$(strip "$MTU")
+TAP=$(strip "$TAP")
+MASK=$(strip "$MASK")
+BRIDGE=$(strip "$BRIDGE")
+NETWORK=$(strip "$NETWORK")
+
 ADD_ERR="Please add the following setting to your container:"
 
 # ######################################
 #  Generic helpers
 # ######################################
-
-enabled() {
-  case "$(strip "${1:-}")" in
-    Y|y|YES|Yes|yes|TRUE|True|true|1|ON|On|on) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-disabled() {
-  case "$(strip "${1:-}")" in
-    N|n|NO|No|no|FALSE|False|false|0|OFF|Off|off) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 isNAT() {
 
@@ -38,6 +32,65 @@ isNAT() {
     *)
       return 1 ;;
   esac
+}
+
+guestIP() {
+
+  local ip="$1"
+  local min="${2:-2}"
+  local last="${ip##*.}"
+
+  if [[ ! "$last" =~ ^[0-9]+$ ]] || (( last < min || last > 254 )); then
+    ip="${ip%.*}.$min"
+  fi
+
+  echo "$ip"
+  return 0
+}
+
+natGuestIP() {
+
+  local ip="$1"
+
+  if [[ "$ip" != "172.30."* ]]; then
+    ip="172.30.$(cut -d. -f3,4 <<< "$ip")"
+  else
+    ip="172.31.$(cut -d. -f3,4 <<< "$ip")"
+  fi
+
+  guestIP "$ip" 2
+}
+
+maskToCIDR() {
+
+  local mask="$1"
+  local prefix=""
+
+  prefix=$(ipcalc -p 0.0.0.0 "$mask" | awk -F= '/^PREFIX=/ { print $2 }')
+
+  if [[ ! "$prefix" =~ ^[0-9]+$ ]] || (( prefix < 1 || prefix > 30 )); then
+    error "Invalid MASK: '$mask'"
+    return 1
+  fi
+
+  echo "$prefix"
+  return 0
+}
+
+networkCIDR() {
+
+  local ip="$1"
+  local network=""
+
+  network=$(ipcalc -n "$ip" "$MASK" | awk -F= '/^NETWORK=/ { print $2 }')
+
+  if [ -z "$network" ]; then
+    error "Failed to calculate network address from IP '$ip' and netmask '$MASK'."
+    return 1
+  fi
+
+  echo "$network/$MASK_PREFIX"
+  return 0
 }
 
 getMTU() {
@@ -139,6 +192,7 @@ configureDNS() {
   fi
 
   # Build dhcp-range lines
+  
   local ranges=""
   (( low > 1 )) && ranges+="dhcp-range=set:${fa},${base}.1,${base}.$((low - 1))"$'\n'
   (( high - low > 1 )) && ranges+="dhcp-range=set:${fa},${base}.$((low + 1)),${base}.$((high - 1))"$'\n'
@@ -218,7 +272,7 @@ EOF
 
     auto $fa
     iface $fa inet static
-        address $gateway/24
+        address $gateway/$MASK_PREFIX
         bridge-ports $tap
         bridge-stp off
         bridge-fd 0
@@ -240,7 +294,6 @@ EOF
 createBridge() {
 
   local gateway="$1"
-  local broadcast="$2"
   local rc
 
   # Create a bridge with a static IP for the VM LAN
@@ -254,7 +307,7 @@ createBridge() {
     setMTU "$BRIDGE" "$LAN_MTU"
   fi
 
-  if ! ip address add "$gateway/24" broadcast "$broadcast" dev "$BRIDGE"; then
+  if ! ip address add "$gateway/$MASK_PREFIX" dev "$BRIDGE"; then
     error "failed to add IP address pool!" && return 1
   fi
 
@@ -386,26 +439,13 @@ configureNAT() {
     fi
   fi
 
-  local ip base
-  base=$(cut -d. -f3,4 <<< "$IP")
+  local ip gateway subnet
 
-  if [[ "$IP" != "172.30."* ]]; then
-    ip="172.30.$base"
-  else
-    ip="172.31.$base"
-  fi
+  ip=$(natGuestIP "$IP")
+  gateway="${ip%.*}.1"
+  subnet=$(networkCIDR "$ip") || return 1
 
-  local last="${ip##*.}"
-
-  if [[ ! "$last" =~ ^[0-9]+$ ]] || (( last < 2 || last > 254 )); then
-    ip="${ip%.*}.4"
-  fi
-
-  local gateway="${ip%.*}.1"
-  local subnet="${ip%.*}.0/24"
-  local broadcast="${ip%.*}.255"
-
-  createBridge "$gateway" "$broadcast" || return 1
+  createBridge "$gateway" || return 1
   createTap "$tuntap" || return 1
 
   # Use the lowest effective VM-LAN MTU, without mutating the parent/uplink MTU.
@@ -496,6 +536,13 @@ getInfo() {
     error "$ADD_ERR -e \"DEV=NAME\" to specify another interface name." && exit 26
   fi
 
+  MASK_PREFIX=$(maskToCIDR "$MASK") || exit 28
+
+  if [[ "$MASK_PREFIX" != "24" ]]; then
+    error "MASK values other than 255.255.255.0 are not supported by the DHCP range generator."
+    exit 28
+  fi
+
   GATEWAY=$(ip route list dev "$DEV" | awk ' /^default/ {print $3}' | head -n 1)
   { IP=$(ip address show dev "$DEV" | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/ | head -n 1); } 2>/dev/null || :
   [ -z "$IP" ] && error "Could not determine container IPv4 address!" && exit 26
@@ -544,7 +591,7 @@ getInfo() {
   GATEWAY_MAC=$(echo "${mac^^}" | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
 
   if enabled "$DEBUG"; then
-    line="Host: $HOST  IP: $IP  Gateway: $GATEWAY  Interface: $DEV  MTU: $mtu"
+    line="Host: $HOST  IP: $IP  Gateway: $GATEWAY  Interface: $DEV  MTU: $mtu  Mask: $MASK/$MASK_PREFIX"
     [[ "$MTU" != "0" && "$MTU" != "$mtu" ]] && line+=" ($MTU)"
     info "$line"
     if [ -f /etc/resolv.conf ]; then
@@ -573,6 +620,11 @@ blockLicense() {
 blockLicense
 
 disabled "$NETWORK" && return 0
+
+if ! isNAT; then
+  error "Unrecognized NETWORK value: \"$NETWORK\""
+  exit 48
+fi
 
 msg="Initializing network..."
 enabled "$DEBUG" && info "$msg"
