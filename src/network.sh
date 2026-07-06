@@ -36,31 +36,17 @@ isNAT() {
   esac
 }
 
-validIP() {
-
-  local ip="$1"
-  local min="${2:-2}"
-  local last="${ip##*.}"
-
-  if [[ ! "$last" =~ ^[0-9]+$ ]] || (( last < min || last > 254 )); then
-    ip="${ip%.*}.$min"
-  fi
-
-  echo "$ip"
-  return 0
-}
-
-containerIP() {
+subnetBase() {
 
   local ip="$1"
 
   if [[ "$ip" != "172.30."* ]]; then
-    ip="172.30.$(cut -d. -f3,4 <<< "$ip")"
+    echo "172.30.$(cut -d. -f3 <<< "$ip")"
   else
-    ip="172.31.$(cut -d. -f3,4 <<< "$ip")"
+    echo "172.31.$(cut -d. -f3 <<< "$ip")"
   fi
 
-  validIP "$ip" 2
+  return 0
 }
 
 maskToCIDR() {
@@ -237,12 +223,9 @@ disableIPv6() {
 configureDNS() {
 
   local fa="$1"
-  local container_ip="$2"
-  local mask="$3"
-  local gateway="$4"
-  local base="${container_ip%.*}"
-  local ip_last="${container_ip##*.}"
-  local gw_last="${gateway##*.}"
+  local mask="$2"
+  local gateway="$3"
+  local base="${gateway%.*}"
   local file="/etc/dnsmasq.d/$fa.conf"
   local mtu_option=""
   local filter_dns=""
@@ -256,27 +239,6 @@ configureDNS() {
     filter_dns="filter-AAAA"
   fi
 
-  # Reserve both the bridge gateway address and the container address inside the VM subnet.
-  # The container address is intentionally excluded from DHCP so it can be used
-  # later as a stable host identity inside the Proxmox VM network.
-
-  # Determine the sorted positions
-  local low high
-  if (( ip_last < gw_last )); then
-    low=$ip_last
-    high=$gw_last
-  else
-    low=$gw_last
-    high=$ip_last
-  fi
-
-  # Build dhcp-range lines
-  local ranges=""
-  (( low > 1 )) && ranges+="dhcp-range=set:${fa},${base}.1,${base}.$((low - 1))"$'\n'
-  (( high - low > 1 )) && ranges+="dhcp-range=set:${fa},${base}.$((low + 1)),${base}.$((high - 1))"$'\n'
-  (( high < 254 )) && ranges+="dhcp-range=set:${fa},${base}.$((high + 1)),${base}.254"$'\n'
-  ranges="${ranges%$'\n'}"  # strip trailing newline
-
   if ! sed 's/^    //' > "$file" <<EOF
 
     # Listen only on bridge
@@ -284,8 +246,8 @@ configureDNS() {
     bind-interfaces
     except-interface=lo
 
-    # IPv4 DHCP ranges
-    $ranges
+    # IPv4 DHCP range
+    dhcp-range=set:${fa},${base}.2,${base}.254
 
     # Set gateway address
     dhcp-option=option:netmask,$mask
@@ -507,11 +469,11 @@ configureNAT() {
     fi
   fi
 
-  local container_ip gateway subnet
+  local base gateway subnet
 
-  container_ip=$(containerIP "$UPLINK")
-  gateway="${container_ip%.*}.1"
-  subnet=$(networkCIDR "$container_ip") || return 1
+  base=$(subnetBase "$UPLINK")
+  gateway="$base.1"
+  subnet=$(networkCIDR "$gateway") || return 1
 
   if ip route show "$subnet" 2>/dev/null | grep -q .; then
     error "VM subnet $subnet conflicts with an existing route inside the container."
@@ -519,12 +481,6 @@ configureNAT() {
   fi
 
   createBridge "$gateway" || return 1
-
-  if ! ip address add "$container_ip/$PREFIX" dev "$BRIDGE"; then
-    error "failed to add container IP address to bridge!"
-    return 1
-  fi
-
   createTap "$tuntap" || return 1
 
   # Use the lowest effective VM-LAN MTU, without mutating the parent/uplink MTU.
@@ -535,7 +491,7 @@ configureNAT() {
   configureTables "$subnet" || return 1
 
   setInterfaces "$BRIDGE" "$TAP" "$gateway" || return 1
-  configureDNS "$BRIDGE" "$container_ip" "$MASK" "$gateway" || return 1
+  configureDNS "$BRIDGE" "$MASK" "$gateway" || return 1
 
   return 0
 }
@@ -624,7 +580,7 @@ getInfo() {
     exit 29
   fi
 
-  local mac mtu="" mtu_custom="N"
+  local mtu="" mtu_custom="N"
 
   if [ -f "/sys/class/net/$DEV/mtu" ]; then
     mtu=$(< "/sys/class/net/$DEV/mtu")
