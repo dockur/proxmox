@@ -145,7 +145,7 @@ configureDNS() {
   (( high < 254 )) && ranges+="dhcp-range=set:${fa},${base}.$((high + 1)),${base}.254"$'\n'
   ranges="${ranges%$'\n'}"  # strip trailing newline
 
-  sed 's/^    //' > "$file" <<EOF
+  if ! sed 's/^    //' > "$file" <<EOF
 
     # Listen only on bridge
     interface=$fa
@@ -171,6 +171,10 @@ configureDNS() {
     dhcp-option=252,"\n"
     dhcp-option=vendor:MSFT,2,1i
 EOF
+  then
+    error "Failed to write dnsmasq config file: $file"
+    return 1
+  fi
 
   return 0
 }
@@ -184,25 +188,33 @@ setInterfaces() {
   # Add all available network interfaces
   local file="/etc/network/interfaces.new"
 
-  sed 's/^    //' > "$file" <<EOF
+  if ! sed 's/^    //' > "$file" <<EOF
     auto lo
     iface lo inet loopback
 EOF
+  then
+    error "Failed to write network interface config file: $file"
+    return 1
+  fi
 
   while IFS= read -r i; do
 
     [[ "${i,,}" == "${fa,,}" ]] && continue
 
-    sed 's/^        //' >> "$file" <<EOF
+    if ! sed 's/^        //' >> "$file" <<EOF
 
         auto $i
         iface $i inet manual
 EOF
+    then
+      error "Failed to append interface $i to config file: $file"
+      return 1
+    fi
 
   done < <(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | sed 's/@.*//')
 
   # Configure bridge
-  sed 's/^    //' >> "$file" <<EOF
+  if ! sed 's/^    //' >> "$file" <<EOF
 
     auto $fa
     iface $fa inet static
@@ -213,6 +225,10 @@ EOF
 
     source /etc/network/interfaces.d/*
 EOF
+  then
+    error "Failed to append bridge config to file: $file"
+    return 1
+  fi
 
   return 0
 }
