@@ -25,6 +25,8 @@ require_cmd() {
     error "Required command not found: $1"
     exit 21
   }
+
+  return 0
 }
 
 require_file() {
@@ -32,6 +34,8 @@ require_file() {
     error "Required file not found: $1"
     exit 22
   }
+
+  return 0
 }
 
 continue_or_exit() {
@@ -60,6 +64,8 @@ check_privileged() {
     error "Please start the container with the --privileged flag!"
     continue_or_exit 14
   fi
+
+  return 0
 }
 
 check_fuse() {
@@ -76,6 +82,8 @@ check_fuse() {
     error "/dev/fuse exists but is not readable/writable."
     continue_or_exit 17
   fi
+
+  return 0
 }
 
 check_kvm() {
@@ -106,6 +114,8 @@ check_kvm() {
     error "KVM acceleration is not available $kvm_err."
     continue_or_exit 19
   fi
+
+  return 0
 }
 
 check_cgroups() {
@@ -121,6 +131,8 @@ check_cgroups() {
   if [ ! -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/system.slice ]; then
     warn "Could not clearly detect cgroup v2 or a systemd cgroup hierarchy."
   fi
+
+  return 0
 }
 
 check_systemd_command() {
@@ -137,6 +149,8 @@ check_systemd_command() {
       warn "Container command is '$*'. For Proxmox VE this should usually be systemd, for example: /sbin/init"
       ;;
   esac
+
+  return 0
 }
 
 remount_shm() {
@@ -153,6 +167,8 @@ remount_shm() {
   if ! mount -o "remount,size=${SHM_SIZE}" /dev/shm; then
     warn "Could not remount /dev/shm with size=${SHM_SIZE}."
   fi
+
+  return 0
 }
 
 set_timezone() {
@@ -194,6 +210,8 @@ prepare_directory() {
   if [ -n "$mode" ]; then
     chmod "$mode" "$path" || :
   fi
+
+  return 0
 }
 
 cleanup_stale_runtime_files() {
@@ -212,6 +230,8 @@ cleanup_stale_runtime_files() {
     /run/postfix/master.pid \
     /var/spool/postfix/pid/master.pid \
     /proxmox.end 2>/dev/null || :
+
+    return 0
 }
 
 # Check environment
