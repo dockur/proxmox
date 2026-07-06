@@ -13,14 +13,42 @@ info () { printf "%b%s%b" "\E[1;34m❯ \E[1;36m" "${1:-}" "\E[0m\n"; }
 error () { printf "%b%s%b" "\E[1;31m❯ " "ERROR: ${1:-}" "\E[0m\n" >&2; }
 warn () { printf "%b%s%b" "\E[1;31m❯ " "Warning: ${1:-}" "\E[0m\n" >&2; }
 
-is_enabled() {
-  case "${1:-}" in
-    Y|y|YES|yes|TRUE|true|1|ON|on) return 0 ;;
+strip() {
+  local value="${1:-}"
+
+  # Remove surrounding whitespace
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+
+  # Remove leading/trailing single/double quotes
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+
+  # Remove surrounding whitespace again
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+
+  printf '%s' "$value"
+}
+
+enabled() {
+  case "$(strip "${1:-}")" in
+    Y|y|YES|Yes|yes|TRUE|True|true|1|ON|On|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+disabled() {
+  case "$(strip "${1:-}")" in
+    N|n|NO|No|no|FALSE|False|false|0|OFF|Off|off) return 0 ;;
     *) return 1 ;;
   esac
 }
 
 require_cmd() {
+
   command -v "$1" >/dev/null 2>&1 || {
     error "Required command not found: $1"
     exit 21
@@ -30,6 +58,7 @@ require_cmd() {
 }
 
 require_file() {
+
   [ -f "$1" ] || {
     error "Required file not found: $1"
     exit 22
@@ -39,9 +68,10 @@ require_file() {
 }
 
 continue_or_exit() {
+
   local code="$1"
 
-  if is_enabled "$DEBUG"; then
+  if enabled "$DEBUG"; then
     warn "DEBUG is enabled (DEBUG=${DEBUG}), continuing despite previous error."
     return 0
   fi
@@ -50,6 +80,7 @@ continue_or_exit() {
 }
 
 check_privileged() {
+
   local cap_bnd
   local last_cap
   local max_cap
@@ -69,7 +100,8 @@ check_privileged() {
 }
 
 check_fuse() {
-  if ! is_enabled "$REQUIRE_FUSE"; then
+
+  if disabled "$REQUIRE_FUSE"; then
     return 0
   fi
 
@@ -90,7 +122,7 @@ check_kvm() {
   local kvm_err=""
   local flags=""
 
-  if ! is_enabled "$REQUIRE_KVM"; then
+  if disabled "$REQUIRE_KVM"; then
     return 0
   fi
 
@@ -119,6 +151,7 @@ check_kvm() {
 }
 
 check_cgroups() {
+
   if [ ! -d /sys/fs/cgroup ]; then
     error "/sys/fs/cgroup is missing. systemd inside the container will not work correctly."
     continue_or_exit 25
@@ -136,6 +169,7 @@ check_cgroups() {
 }
 
 check_systemd_command() {
+
   if [ "$#" -eq 0 ]; then
     error "No command specified. This image should normally be started with systemd as PID 1."
     exit 26
@@ -154,6 +188,7 @@ check_systemd_command() {
 }
 
 remount_shm() {
+
   if [ ! -d /dev/shm ]; then
     warn "/dev/shm does not exist."
     return 0
@@ -184,6 +219,7 @@ set_timezone() {
 }
 
 check_localtime() {
+
   if [ ! -e /etc/localtime ] && [ ! -L /etc/localtime ]; then
     return 1
   fi
@@ -200,6 +236,7 @@ check_localtime() {
 }
 
 prepare_directory() {
+
   local path="$1"
   local owner="$2"
   local mode="${3:-}"
@@ -215,6 +252,7 @@ prepare_directory() {
 }
 
 cleanup_stale_runtime_files() {
+
   rm -f \
     /run/pveproxy/pveproxy.pid \
     /run/pvedaemon/pvedaemon.pid \
