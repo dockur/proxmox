@@ -675,25 +675,72 @@ configureMAC() {
   return 0
 }
 
-printNetworkDebug() {
+formatAddress() {
 
-  local line=""
+  local ip="${1:-}"
+  local prefix="${2:-}"
+  local result="$ip"
+
+  [ -z "$result" ] && return 1
+
+  if [ -n "$prefix" ] && [[ "$prefix" != "24" ]]; then
+    result+="/$prefix"
+  fi
+
+  echo "$result"
+  return 0
+}
+
+showHostInfo() {
+
+  local mtu=""
   local host=""
-  local nameservers=""
+  local uplink=""
 
   enabled "$DEBUG" || return 0
 
-  host=$(hostname -s 2>/dev/null || true)
-  [ -z "$host" ] && host="unknown"
+  host=$(containerID)
+  local line="Host: $host"
 
-  line="Host: $host  IP: $UPLINK  Gateway: $GATEWAY  Interface: $DEV  MAC: $MAC  MTU: $MTU  Mask: $MASK/$PREFIX"
-  info "$line"
-
-  if [ -f /etc/resolv.conf ]; then
-    nameservers=$(grep '^nameserver ' /etc/resolv.conf | sed 's/^nameserver //' | paste -sd ',' | sed 's/,/, /g')
-    [ -n "$nameservers" ] && info "Nameservers: $nameservers"
+  local iface="$DEV"
+  if [ -n "$NIC" ] && [[ "${NIC,,}" != "veth" ]]; then
+    iface+="/$NIC"
   fi
 
+  [ -z "$iface" ] && iface="(none)"
+  line+="  Interface: $iface"
+
+  uplink=$(formatAddress "$UPLINK" "$PREFIX" || true)
+  [ -z "$uplink" ] && uplink="(none)"
+  line+="  IP: $uplink"
+
+  local gateway="${GATEWAY:-}"
+  [ -z "$gateway" ] && gateway="(none)"
+  line+="  Gateway: $gateway"
+
+  mtu=$(getMTU "$DEV")
+  if [ -n "$mtu" ] && [[ "$mtu" != "0" && "$mtu" != "1500" ]]; then
+    line+="  MTU: $mtu"
+  fi
+
+  local count="0"
+  local file="/etc/resolv.conf"
+
+  if [ -f "$file" ]; then
+    count=$(grep -c '^nameserver ' "$file" || true)
+    nameservers=$(grep '^nameserver ' "$file" | sed 's/^nameserver //' | paste -sd ',' | sed 's/,/, /g')
+  fi
+
+  [ -z "$nameservers" ] && nameservers="(none)"
+
+  if (( count <= 1 )); then
+    line+="  Nameserver: $nameservers"
+    info "$line"
+  else
+    info "$line"
+    info "Nameservers: $nameservers"
+  fi
+  
   echo
   return 0
 }
@@ -714,7 +761,7 @@ prepareNetwork() {
   configureMTU
   configureMAC
 
-  printNetworkDebug
+  showHostInfo
 
   return 0
 }
