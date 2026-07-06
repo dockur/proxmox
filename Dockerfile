@@ -36,6 +36,7 @@ RUN <<EOF
     gnupg \
     procps \
     chrony \
+    ipcalc \
     postfix \
     ethtool \
     dnsmasq \
