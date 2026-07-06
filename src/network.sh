@@ -39,14 +39,25 @@ isNAT() {
 subnetBase() {
 
   local ip="$1"
+  local third=""
+  local second=""
+  local base=""
+  local subnet=""
 
-  if [[ "$ip" != "172.30."* ]]; then
-    echo "172.30.$(cut -d. -f3 <<< "$ip")"
-  else
-    echo "172.31.$(cut -d. -f3 <<< "$ip")"
-  fi
+  third=$(cut -d. -f3 <<< "$ip")
 
-  return 0
+  for second in {30..254}; do
+    base="172.$second.$third"
+    subnet="$base.0/$PREFIX"
+
+    if ! ip route show "$subnet" 2>/dev/null | grep -q .; then
+      echo "$base"
+      return 0
+    fi
+  done
+
+  error "No available VM subnet found in 172.30.$third.0/$PREFIX through 172.254.$third.0/$PREFIX."
+  return 1
 }
 
 maskToCIDR() {
@@ -471,7 +482,7 @@ configureNAT() {
 
   local base gateway subnet
 
-  base=$(subnetBase "$UPLINK")
+  base=$(subnetBase "$UPLINK") || return 1
   gateway="$base.1"
   subnet=$(networkCIDR "$gateway") || return 1
 
@@ -553,26 +564,37 @@ closeBridge() {
 #  Detection
 # ######################################
 
-getInfo() {
-
-  detectInterface
+validateInterface() {
 
   if [ ! -d "/sys/class/net/$DEV" ]; then
     error "Network interface '$DEV' does not exist inside the container!"
-    error "$ADD_ERR -e \"DEV=NAME\" to specify another interface name." && exit 26
+    error "$ADD_ERR -e \"DEV=NAME\" to specify another interface name."
+    exit 26
   fi
+
+  return 0
+}
+
+validateMask() {
 
   PREFIX=$(maskToCIDR "$MASK") || exit 28
 
   if [[ "$PREFIX" != "24" ]]; then
-    error "MASK values other than 255.255.255.0 are not supported by the DHCP range generator."
+    error "MASK values other than 255.255.255.0 are not supported by this network layout."
     exit 28
   fi
 
-  detectAddresses
+  return 0
+}
+
+validateAddresses() {
+
   [ -z "$UPLINK" ] && error "Could not determine container IPv4 address!" && exit 26
 
-  detectAdapter
+  return 0
+}
+
+validateAdapter() {
 
   if [[ -n "$BUS" && "${BUS,,}" != "n/a" && "${BUS,,}" != "tap" ]]; then
     enabled "$DEBUG" && info "Detected NIC: ${NIC:-unknown}  BUS: $BUS"
@@ -580,7 +602,13 @@ getInfo() {
     exit 29
   fi
 
-  local mtu="" mtu_custom="N"
+  return 0
+}
+
+configureMTU() {
+
+  local mtu=""
+  local mtu_custom="N"
 
   if [ -f "/sys/class/net/$DEV/mtu" ]; then
     mtu=$(< "/sys/class/net/$DEV/mtu")
@@ -598,7 +626,13 @@ getInfo() {
     LAN_MTU="1500"
   fi
 
+  return 0
+}
+
+configureMAC() {
+
   local container=""
+
   container=$(containerID)
 
   if [ -z "$MAC" ]; then
@@ -615,23 +649,57 @@ getInfo() {
   fi
 
   if [[ ${#MAC} != 17 ]]; then
-    error "Invalid MAC address: '$MAC', should be 12 or 17 digits long!" && exit 28
+    error "Invalid MAC address: '$MAC', should be 12 or 17 digits long!"
+    exit 28
   fi
 
   # Keep the guest-facing gateway MAC stable across runs, otherwise Windows guests
   # may detect a new network every boot.
   GATEWAY_MAC=$(gatewayMAC "$MAC")
 
-  if enabled "$DEBUG"; then
-    line="Host: $container  IP: $UPLINK  Gateway: $GATEWAY  Interface: $DEV  MAC: $MAC  MTU: $mtu  Mask: $MASK/$PREFIX"
-    [[ "$MTU" != "0" && "$MTU" != "$mtu" ]] && line+=" ($MTU)"
-    info "$line"
-    if [ -f /etc/resolv.conf ]; then
-      nameservers=$(grep '^nameserver ' /etc/resolv.conf | sed 's/^nameserver //' | paste -sd ',' | sed 's/,/, /g')
-      [ -n "$nameservers" ] && info "Nameservers: $nameservers"
-    fi
-    echo
+  return 0
+}
+
+printNetworkDebug() {
+
+  local line=""
+  local host=""
+  local nameservers=""
+
+  enabled "$DEBUG" || return 0
+
+  host=$(hostname -s 2>/dev/null || true)
+  [ -z "$host" ] && host="unknown"
+
+  line="Host: $host  IP: $UPLINK  Gateway: $GATEWAY  Interface: $DEV  MAC: $MAC  MTU: $MTU  Mask: $MASK/$PREFIX"
+  info "$line"
+
+  if [ -f /etc/resolv.conf ]; then
+    nameservers=$(grep '^nameserver ' /etc/resolv.conf | sed 's/^nameserver //' | paste -sd ',' | sed 's/,/, /g')
+    [ -n "$nameservers" ] && info "Nameservers: $nameservers"
   fi
+
+  echo
+  return 0
+}
+
+prepareNetwork() {
+
+  detectInterface
+  validateInterface
+
+  validateMask
+
+  detectAddresses
+  validateAddresses
+
+  detectAdapter
+  validateAdapter
+
+  configureMTU
+  configureMAC
+
+  printNetworkDebug
 
   return 0
 }
@@ -661,7 +729,7 @@ fi
 msg="Initializing network..."
 enabled "$DEBUG" && info "$msg"
 
-getInfo
+prepareNetwork
 closeBridge
 
 # Configure NAT networking
