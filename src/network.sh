@@ -34,7 +34,7 @@ isNAT() {
   esac
 }
 
-guestIP() {
+validIP() {
 
   local ip="$1"
   local min="${2:-2}"
@@ -48,7 +48,7 @@ guestIP() {
   return 0
 }
 
-natGuestIP() {
+containerIP() {
 
   local ip="$1"
 
@@ -58,7 +58,7 @@ natGuestIP() {
     ip="172.31.$(cut -d. -f3,4 <<< "$ip")"
   fi
 
-  guestIP "$ip" 2
+  validIP "$ip" 2
 }
 
 maskToCIDR() {
@@ -158,11 +158,11 @@ disableIPv6() {
 configureDNS() {
 
   local fa="$1"
-  local ip="$2"
+  local container_ip="$2"
   local mask="$3"
   local gateway="$4"
-  local base="${ip%.*}"
-  local ip_last="${ip##*.}"
+  local base="${container_ip%.*}"
+  local ip_last="${container_ip##*.}"
   local gw_last="${gateway##*.}"
   local file="/etc/dnsmasq.d/$fa.conf"
   local mtu_option=""
@@ -177,9 +177,9 @@ configureDNS() {
     filter_dns="filter-AAAA"
   fi
 
-  # Reserve both the bridge gateway address and the translated container address.
-  # The translated address is intentionally excluded from DHCP so it can be used
-  # later as a stable container/host identity inside the VM subnet.
+  # Reserve both the bridge gateway address and the container address inside the VM subnet.
+  # The container address is intentionally excluded from DHCP so it can be used
+  # later as a stable host identity inside the Proxmox VM network.
 
   # Determine the sorted positions
   local low high
@@ -192,7 +192,6 @@ configureDNS() {
   fi
 
   # Build dhcp-range lines
-  
   local ranges=""
   (( low > 1 )) && ranges+="dhcp-range=set:${fa},${base}.1,${base}.$((low - 1))"$'\n'
   (( high - low > 1 )) && ranges+="dhcp-range=set:${fa},${base}.$((low + 1)),${base}.$((high - 1))"$'\n'
@@ -439,11 +438,11 @@ configureNAT() {
     fi
   fi
 
-  local ip gateway subnet
+  local container_ip gateway subnet
 
-  ip=$(natGuestIP "$IP")
-  gateway="${ip%.*}.1"
-  subnet=$(networkCIDR "$ip") || return 1
+  container_ip=$(containerIP "$IP")
+  gateway="${container_ip%.*}.1"
+  subnet=$(networkCIDR "$container_ip") || return 1
 
   createBridge "$gateway" || return 1
   createTap "$tuntap" || return 1
@@ -456,7 +455,7 @@ configureNAT() {
   configureTables "$subnet" || return 1
 
   setInterfaces "$BRIDGE" "$TAP" "$gateway" || return 1
-  configureDNS "$BRIDGE" "$ip" "$MASK" "$gateway" || return 1
+  configureDNS "$BRIDGE" "$container_ip" "$MASK" "$gateway" || return 1
 
   return 0
 }
