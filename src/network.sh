@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 # Docker environment variables
 
-: "${IP:=""}"
 : "${DEV:=""}"
 : "${MTU:=""}"
 : "${MAC:=""}"
@@ -13,7 +12,6 @@ set -Eeuo pipefail
 : "${MASK:="255.255.255.0"}"
 
 # Sanitize variables
-IP=$(strip "$IP")
 DEV=$(strip "$DEV")
 MTU=$(strip "$MTU")
 TAP=$(strip "$TAP")
@@ -93,7 +91,7 @@ networkCIDR() {
     return 1
   fi
 
-  echo "$network/$MASK_PREFIX"
+  echo "$network/$PREFIX"
   return 0
 }
 
@@ -171,7 +169,7 @@ detectInterface() {
 detectAddresses() {
 
   GATEWAY=$(ip route list dev "$DEV" | awk ' /^default/ {print $3}' | head -n 1)
-  { IP=$(ip address show dev "$DEV" | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/ | head -n 1); } 2>/dev/null || :
+  { UPLINK=$(ip address show dev "$DEV" | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/ | head -n 1); } 2>/dev/null || :
 
   IP6=""
 
@@ -196,6 +194,26 @@ detectAdapter() {
   NIC=$(grep -m 1 -i 'driver:' <<< "$result" | awk '{print $2}')
   BUS=$(grep -m 1 -i 'bus-info:' <<< "$result" | awk '{print $2}')
 
+  return 0
+}
+
+containerID() {
+
+  local id=""
+
+  id=$(hostname -s 2>/dev/null || true)
+
+  if [ -z "$id" ] && [ -s /etc/machine-id ]; then
+    id=$(< /etc/machine-id)
+  fi
+
+  if [ -z "$id" ] && [ -s /proc/sys/kernel/random/boot_id ]; then
+    id=$(< /proc/sys/kernel/random/boot_id)
+  fi
+
+  [ -z "$id" ] && id="unknown"
+
+  echo "$id"
   return 0
 }
 
@@ -332,7 +350,7 @@ EOF
 
     auto $fa
     iface $fa inet static
-        address $gateway/$MASK_PREFIX
+        address $gateway/$PREFIX
         bridge-ports $tap
         bridge-stp off
         bridge-fd 0
@@ -367,7 +385,7 @@ createBridge() {
     setMTU "$BRIDGE" "$LAN_MTU"
   fi
 
-  if ! ip address add "$gateway/$MASK_PREFIX" dev "$BRIDGE"; then
+  if ! ip address add "$gateway/$PREFIX" dev "$BRIDGE"; then
     error "failed to add IP address pool!" && return 1
   fi
 
@@ -491,7 +509,7 @@ configureNAT() {
 
   local container_ip gateway subnet
 
-  container_ip=$(containerIP "$IP")
+  container_ip=$(containerIP "$UPLINK")
   gateway="${container_ip%.*}.1"
   subnet=$(networkCIDR "$container_ip") || return 1
 
@@ -582,15 +600,15 @@ getInfo() {
     error "$ADD_ERR -e \"DEV=NAME\" to specify another interface name." && exit 26
   fi
 
-  MASK_PREFIX=$(maskToCIDR "$MASK") || exit 28
+  PREFIX=$(maskToCIDR "$MASK") || exit 28
 
-  if [[ "$MASK_PREFIX" != "24" ]]; then
+  if [[ "$PREFIX" != "24" ]]; then
     error "MASK values other than 255.255.255.0 are not supported by the DHCP range generator."
     exit 28
   fi
 
   detectAddresses
-  [ -z "$IP" ] && error "Could not determine container IPv4 address!" && exit 26
+  [ -z "$UPLINK" ] && error "Could not determine container IPv4 address!" && exit 26
 
   detectAdapter
 
@@ -622,7 +640,7 @@ getInfo() {
   container=$(containerID)
 
   if [ -z "$MAC" ]; then
-    # Generate a MAC address based on Docker container ID in hostname
+    # Generate a MAC address based on a stable container identifier when possible.
     MAC=$(echo "$container" | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
   fi
 
@@ -641,9 +659,9 @@ getInfo() {
   # Keep the guest-facing gateway MAC stable across runs, otherwise Windows guests
   # may detect a new network every boot.
   GATEWAY_MAC=$(gatewayMAC "$MAC")
-  
+
   if enabled "$DEBUG"; then
-    line="Host: $container  IP: $IP  Gateway: $GATEWAY  Interface: $DEV  MAC: $MAC  MTU: $mtu  Mask: $MASK/$MASK_PREFIX"
+    line="Host: $container  IP: $UPLINK  Gateway: $GATEWAY  Interface: $DEV  MAC: $MAC  MTU: $mtu  Mask: $MASK/$PREFIX"
     [[ "$MTU" != "0" && "$MTU" != "$mtu" ]] && line+=" ($MTU)"
     info "$line"
     if [ -f /etc/resolv.conf ]; then
