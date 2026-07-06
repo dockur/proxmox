@@ -621,14 +621,29 @@ getInfo() {
   local container=""
   container=$(containerID)
 
-  # Generate a MAC address based on Docker container ID in hostname
-  mac=$(echo "$container" | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
+  if [ -z "$MAC" ]; then
+    # Generate a MAC address based on Docker container ID in hostname
+    MAC=$(echo "$container" | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
+  fi
 
-  # Keep the guest-facing gateway MAC stable across runs
-  GATEWAY_MAC=$(echo "${mac^^}" | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
+  MAC="${MAC,,}"
+  MAC="${MAC//-/:}"
 
+  if [[ ${#MAC} == 12 ]]; then
+    local m="$MAC"
+    MAC="${m:0:2}:${m:2:2}:${m:4:2}:${m:6:2}:${m:8:2}:${m:10:2}"
+  fi
+
+  if [[ ${#MAC} != 17 ]]; then
+    error "Invalid MAC address: '$MAC', should be 12 or 17 digits long!" && exit 28
+  fi
+
+  # Keep the guest-facing gateway MAC stable across runs, otherwise Windows guests
+  # may detect a new network every boot.
+  GATEWAY_MAC=$(gatewayMAC "$MAC")
+  
   if enabled "$DEBUG"; then
-    line="Host: $container  IP: $IP  Gateway: $GATEWAY  Interface: $DEV  MTU: $mtu  Mask: $MASK/$MASK_PREFIX"
+    line="Host: $container  IP: $IP  Gateway: $GATEWAY  Interface: $DEV  MAC: $MAC  MTU: $mtu  Mask: $MASK/$MASK_PREFIX"
     [[ "$MTU" != "0" && "$MTU" != "$mtu" ]] && line+=" ($MTU)"
     info "$line"
     if [ -f /etc/resolv.conf ]; then
