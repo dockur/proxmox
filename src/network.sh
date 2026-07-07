@@ -518,6 +518,8 @@ configureNAT() {
   setInterfaces "$BRIDGE" "$TAP" "$gateway" || return 1
   configureDNS "$BRIDGE" "$MASK" "$gateway" || return 1
 
+  showBridgeInfo "$subnet" "$gateway"
+
   return 0
 }
 
@@ -756,10 +758,32 @@ showHostInfo() {
 
 showBridgeInfo() {
 
-  local line="❯ Bridge: $BRIDGE"
+  local subnet="$1"
+  local gateway="$2"
+  local mtu=""
+  local base=""
+  local dhcp=""
+  local display=""
+
+  display=$(formatAddress "$gateway" "$PREFIX" || true)
+
+  base="${gateway%.*}"
+  dhcp="$base.2-$base.254"
+
+  local line="❯ Bridge: $BRIDGE  |  Gateway: $display  |  DHCP: $dhcp"
+
+  if [[ "$PREFIX" != "24" ]]; then
+    line+="  |  Subnet: $subnet"
+  fi
+
+  mtu=$(getMTU "$BRIDGE")
+  if [ -n "$mtu" ] && [[ "$mtu" != "0" && "$mtu" != "1500" ]]; then
+    line+="  |  MTU: $mtu"
+  fi
 
   echo "$line"
   echo
+  return 0
 }
 
 prepareNetwork() {
@@ -820,7 +844,6 @@ if ! configureNAT; then
 
 else
 
-  showBridgeInfo
   enabled "$DEBUG" && info "Initialized network successfully..."
 
 fi
