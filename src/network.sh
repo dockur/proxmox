@@ -455,11 +455,10 @@ configureTables() {
     error "$tables_err" && return 1
   fi
 
-  # Allow return traffic from the Docker uplink back to the Proxmox VM subnet.
+  # Allow traffic from the Docker uplink back to the Proxmox VM subnet.
   if ! iptables -A FORWARD \
     -d "$subnet" \
     -i "$DEV" \
-    -m conntrack --ctstate RELATED,ESTABLISHED \
     -m comment --comment "$rule_tag" \
     -j ACCEPT; then
     error "$tables_err" && return 1
@@ -744,7 +743,7 @@ showHostInfo() {
   [[ "$nameservers" == "127.0.0.1"* ]] && nameservers=""
 
   echo
-  
+
   if (( ${#nameservers} <= 40 )); then
     [ -n "$nameservers" ] && line+="  |  DNS: $nameservers"
     echo "$line"
