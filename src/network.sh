@@ -426,7 +426,10 @@ configureTables() {
   local tables_err="failed to configure IP tables!"
   local tables="the 'ip_tables' kernel module is not loaded. Try this command: sudo modprobe ip_tables iptable_nat"
 
-  clearTables
+  if ! clearTables; then
+    error "failed to select a working IP tables backend!"
+    return 1
+  fi
 
   # NAT traffic from bridge subnet to Docker uplink
   if ! iptables -t nat -A POSTROUTING \
@@ -455,10 +458,11 @@ configureTables() {
     error "$tables_err" && return 1
   fi
 
-  # Allow traffic from the Docker uplink back to the Proxmox VM subnet.
+  # Allow return and related traffic from the Docker uplink.
   if ! iptables -A FORWARD \
     -d "$subnet" \
     -i "$DEV" \
+    -m conntrack --ctstate RELATED,ESTABLISHED \
     -m comment --comment "$rule_tag" \
     -j ACCEPT; then
     error "$tables_err" && return 1
@@ -526,20 +530,34 @@ configureNAT() {
 #  Cleanup
 # ######################################
 
+selectTables() {
+
+  local backend=""
+
+  # Prefer the legacy backend when available, but fall back to nftables
+  # on systems where the legacy backend is unavailable.
+  if command -v iptables-legacy >/dev/null 2>&1 && iptables-legacy -V >/dev/null 2>&1; then
+    backend="legacy"
+  elif command -v iptables-nft >/dev/null 2>&1 && iptables-nft -V >/dev/null 2>&1; then
+    backend="nft"
+  else
+    return 1
+  fi
+
+  if ! update-alternatives --set iptables "$(command -v "iptables-$backend")" > /dev/null 2>&1; then
+    return 1
+  fi
+
+  return 0
+}
+
 clearTables() {
 
   local table="" line rules
   local rule_tag="remove"
   local re="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
 
-  # Choose between iptables or nftables
-  if command -v iptables-nft >/dev/null 2>&1 && iptables-nft -V >/dev/null 2>&1; then
-    update-alternatives --set iptables /usr/sbin/iptables-nft > /dev/null
-    update-alternatives --set ip6tables /usr/sbin/ip6tables-nft > /dev/null
-  else
-    update-alternatives --set iptables /usr/sbin/iptables-legacy > /dev/null
-    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy > /dev/null
-  fi
+  selectTables || return 1
 
   # Store the current iptables ruleset
   ! rules=$(iptables-save 2> /dev/null) && return 0
@@ -572,7 +590,7 @@ closeBridge() {
   ip link set "$BRIDGE" down &> /dev/null || :
   ip link delete "$BRIDGE" &> /dev/null || :
 
-  clearTables
+  clearTables || :
   return 0
 }
 
