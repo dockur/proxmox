@@ -462,7 +462,6 @@ configureTables() {
   if ! iptables -A FORWARD \
     -d "$subnet" \
     -i "$DEV" \
-    -m conntrack --ctstate RELATED,ESTABLISHED \
     -m comment --comment "$rule_tag" \
     -j ACCEPT; then
     error "$tables_err" && return 1
