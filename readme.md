@@ -63,12 +63,13 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
 ## Requirements ⚙️
 
- - A Linux host with KVM support, or Docker Desktop / Podman on Windows 11 with nested virtualization enabled.
- - At least 2 GB of RAM available.
- - At least 32 GB of free disk space.
+- Docker or Podman on a Linux host with KVM support.
+- Docker Desktop or Podman (Desktop) on Windows 11 with nested virtualization enabled.
+- At least 2 GB of available RAM.
+- At least 32 GB of free disk space.
 
 > [!NOTE]
-> Docker Desktop on macOS and Windows 10 do not currently provide the required KVM support for this image.
+> Docker Desktop on Linux, macOS, and Windows 10 does not currently provide KVM access to containers and is therefore not supported.
 
 ## FAQ 💬
 
@@ -108,31 +109,36 @@ docker run -it --rm --name proxmox --hostname pve --privileged -e "PASSWORD=root
 
   Yes, see our [Proxmox Backup Server](https://github.com/dockur/proxmox-backup), [Proxmox Datacenter Manager](https://github.com/dockur/proxmox-dm) and [Proxmox Mail Gateway](https://github.com/dockur/proxmox-mail) containers.
 
-### How do I verify if my system supports the KVM virtualization used by Proxmox?
+### How do I verify that KVM is available?
 
-  First check if your software is compatible using this chart:
+  First, make sure your platform and container runtime meet the [requirements](#requirements-️) listed above.
 
-  | **Product**  | **Linux** | **Win11** | **Win10** | **macOS** |
-  |---|---|---|---|---|
-  | Docker CLI        | ✅   | ✅       | ❌        | ❌ |
-  | Docker Desktop    | ❌   | ✅       | ❌        | ❌ | 
-  | Podman CLI        | ✅   | ✅       | ❌        | ❌ | 
-  | Podman Desktop    | ✅   | ✅       | ❌        | ❌ | 
-
-  After that you can run the following commands in Linux to check your system:
+  On a Linux host, install `cpu-checker` and run:
 
   ```bash
   sudo apt install cpu-checker
   sudo kvm-ok
   ```
 
-  If you receive an error from `kvm-ok` indicating that KVM cannot be used, please check whether:
+  A working configuration should report:
 
-  - the virtualization extensions (`Intel VT-x` or `AMD SVM`) are enabled in your BIOS.
+  ```text
+  KVM acceleration can be used
+  ```
 
-  - you enabled "nested virtualization" if you are running the container inside a virtual machine.
+  You can also verify that the KVM device exists:
 
-  - you are not using a cloud provider, as most of them do not allow nested virtualization for their VPSs.
+  ```bash
+  ls -l /dev/kvm
+  ```
+
+  If KVM is unavailable, check whether:
+
+  - Hardware virtualization (`Intel VT-x` or `AMD-V`) is enabled in your BIOS or UEFI.
+  - Nested virtualization is enabled when the host itself is a virtual machine.
+  - Your VPS or cloud provider supports nested virtualization.
+
+  If `kvm-ok` succeeds but the container still reports that KVM is unavailable, you can temporarily add `privileged: true` to your Compose file to rule out a permission or device-access issue.
 
 ## Acknowledgements 🙏
 
