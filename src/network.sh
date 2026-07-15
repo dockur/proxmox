@@ -112,8 +112,8 @@ maskToCIDR() {
     }
   ')
 
-  if [[ ! "$prefix" =~ ^[0-9]+$ ]] || (( prefix < 1 || prefix > 24 )); then
-    error "Invalid MASK: '$mask' (supported range: /1 through /24)"
+  if [[ ! "$prefix" =~ ^[0-9]+$ ]] || (( prefix < 0 || prefix > 32 )); then
+    error "Invalid MASK: '$mask'"
     return 1
   fi
 
@@ -525,65 +525,37 @@ configureTables() {
 
   checkExistingTables
 
-  # Apply source NAT to traffic leaving the VM subnet through the uplink.
+  # NAT traffic from the VM subnet leaving through any external interface.
   if ! iptables -t nat -A POSTROUTING \
-    -o "$DEV" \
+    ! -o "$BRIDGE" \
     -s "$subnet" \
     ! -d "$subnet" \
     -m comment --comment "$rule_tag" \
-    -j MASQUERADE > /dev/null 2>&1; then
-
-    if ! iptables -t nat -A POSTROUTING \
-      -o "$DEV" \
-      -s "$subnet" \
-      ! -d "$subnet" \
-      -m comment --comment "$rule_tag" \
-      -j MASQUERADE; then
-      error "$tables"
-      return 1
-    fi
+    -j MASQUERADE; then
+    error "$tables"
+    return 1
   fi
 
-  # Allow connections initiated from the VM subnet.
+  # Allow traffic from the VM bridge to any external interface.
   if ! iptables -A FORWARD \
     -i "$BRIDGE" \
-    -o "$DEV" \
+    ! -o "$BRIDGE" \
     -s "$subnet" \
-    -m conntrack --ctstate NEW,ESTABLISHED,RELATED \
     -m comment --comment "$rule_tag" \
-    -j ACCEPT > /dev/null 2>&1; then
-
-    if ! iptables -A FORWARD \
-      -i "$BRIDGE" \
-      -o "$DEV" \
-      -s "$subnet" \
-      -m conntrack --ctstate NEW,ESTABLISHED,RELATED \
-      -m comment --comment "$rule_tag" \
-      -j ACCEPT; then
-      error "$tables_err"
-      return 1
-    fi
+    -j ACCEPT; then
+    error "$tables_err"
+    return 1
   fi
 
-  # Allow only reply traffic for connections initiated from the VM subnet.
+  # Allow traffic from any external interface to the VM subnet.
   if ! iptables -A FORWARD \
-    -i "$DEV" \
+    ! -i "$BRIDGE" \
     -o "$BRIDGE" \
     -d "$subnet" \
-    -m conntrack --ctstate ESTABLISHED,RELATED \
     -m comment --comment "$rule_tag" \
-    -j ACCEPT > /dev/null 2>&1; then
-
-    if ! iptables -A FORWARD \
-      -i "$DEV" \
-      -o "$BRIDGE" \
-      -d "$subnet" \
-      -m conntrack --ctstate ESTABLISHED,RELATED \
-      -m comment --comment "$rule_tag" \
-      -j ACCEPT; then
-      error "$tables_err"
-      return 1
-    fi
+    -j ACCEPT; then
+    error "$tables_err"
+    return 1
   fi
 
   return 0
