@@ -11,6 +11,9 @@ set -Eeuo pipefail
 : "${BRIDGE:="vmbr0"}"
 : "${MASK:="255.255.255.0"}"
 
+: "${ENGINE:=""}"
+: "${ROOTLESS:="N"}"
+
 # Sanitize variables
 DEV=$(strip "$DEV")
 MTU=$(strip "$MTU")
@@ -139,6 +142,38 @@ networkCIDR() {
   return 0
 }
 
+detectEngine() {
+
+  if [ -f "/run/.containerenv" ]; then
+    ENGINE="${container:-}"
+
+    if [[ "${ENGINE,,}" == *"podman"* ]]; then
+      ENGINE="Podman"
+    else
+      [ -z "$ENGINE" ] && ENGINE="Kubernetes"
+    fi
+  elif [ -f "/.dockerenv" ]; then
+    ENGINE="Docker"
+  fi
+
+  return 0
+}
+
+detectRootless() {
+
+  local uid_map=""
+
+  uid_map=$(awk '{$1=$1; print}' /proc/self/uid_map 2>/dev/null || true)
+
+  if [[ "$uid_map" == "0 0 4294967295" ]]; then
+    ROOTLESS="N"
+  else
+    ROOTLESS="Y"
+  fi
+
+  return 0
+}
+
 detectInterface() {
 
   if [ -n "$DEV" ]; then
@@ -162,15 +197,19 @@ detectAddresses() {
 
   local rc=0
 
-  GATEWAY=$(ip route list dev "$DEV" | awk ' /^default/ {print $3}' | head -n 1)
+  GATEWAY=$(ip route list dev "$DEV" | awk '/^default/ { print $3 }' | head -n 1)
   { UPLINK=$(ip address show dev "$DEV" | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/ | head -n 1); } 2>/dev/null || :
 
   IP6=""
 
-  if [ -f /proc/net/if_inet6 ] && [[ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null)" != "1" ]]; then
+  if [ -f /proc/net/if_inet6 ] &&
+    [[ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null)" != "1" ]]; then
+
     { IP6=$(ip -6 addr show dev "$DEV" scope global up); rc=$?; } 2>/dev/null || :
     (( rc != 0 )) && IP6=""
-    [ -n "$IP6" ] && IP6=$(echo "$IP6" | sed -e's/^.*inet6 \([^ ]*\)\/.*$/\1/;t;d' | head -n 1)
+
+    [ -n "$IP6" ] &&
+      IP6=$(echo "$IP6" | sed -e 's/^.*inet6 \([^ ]*\)\/.*$/\1/;t;d' | head -n 1)
   fi
 
   return 0
@@ -185,8 +224,8 @@ detectAdapter() {
 
   result=$(ethtool -i "$DEV" 2>/dev/null || :)
 
-  NIC=$(grep -m 1 -i 'driver:' <<< "$result" | awk '{print $2}')
-  BUS=$(grep -m 1 -i 'bus-info:' <<< "$result" | awk '{print $2}')
+  NIC=$(grep -m 1 -i 'driver:' <<< "$result" | awk '{ print $2 }')
+  BUS=$(grep -m 1 -i 'bus-info:' <<< "$result" | awk '{ print $2 }')
 
   return 0
 }
@@ -217,7 +256,7 @@ disableIPv6() {
 
   [ -d "/proc/sys/net/ipv6/conf/$dev" ] || return 0
 
-  # Best-effort only: Docker/rootless/container sysctl writes can fail.
+  # Best-effort only: container sysctl writes can fail.
   sysctl -w "net.ipv6.conf.$dev.disable_ipv6=1" > /dev/null 2>&1 || :
   sysctl -w "net.ipv6.conf.$dev.accept_ra=0" > /dev/null 2>&1 || :
 
@@ -310,10 +349,10 @@ setInterfaces() {
   local fa="$1"
   local tap="$2"
   local gateway="$3"
+  local file="/etc/network/interfaces.new"
+  local i=""
 
   # Add all available network interfaces
-  local file="/etc/network/interfaces.new"
-
   if ! sed 's/^    //' > "$file" <<EOF
     auto lo
     iface lo inet loopback
@@ -337,7 +376,7 @@ EOF
       return 1
     fi
 
-  done < <(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | sed 's/@.*//')
+  done < <(ip -o link show | awk -F': ' '{ print $2 }' | grep -v lo | sed 's/@.*//')
 
   # Configure bridge
   if ! sed 's/^    //' >> "$file" <<EOF
@@ -366,12 +405,14 @@ EOF
 createBridge() {
 
   local gateway="$1"
-  local rc msg=""
+  local rc=0 msg=""
 
   # Create a bridge with a static IP for the VM LAN
   { msg=$(ip link add dev "$BRIDGE" type bridge 2>&1); rc=$?; } || :
 
   if (( rc != 0 )); then
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
     [ -n "$msg" ] && echo "$msg" >&2
     error "failed to create bridge. $ADD_ERR --cap-add NET_ADMIN"
     return 1
@@ -382,7 +423,10 @@ createBridge() {
   fi
 
   if ! ip address add "$gateway/$PREFIX" dev "$BRIDGE"; then
-    error "failed to add IP address pool!" && return 1
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
+    error "failed to add IP address pool!"
+    return 1
   fi
 
   while ! ip link set "$BRIDGE" up; do
@@ -399,12 +443,14 @@ createBridge() {
 createTap() {
 
   local tuntap="$1"
-  local rc msg=""
+  local rc=0 msg=""
 
   # Set tap to the bridge created
   { msg=$(ip tuntap add dev "$TAP" mode tap 2>&1); rc=$?; } || :
 
   if (( rc != 0 )); then
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
     [ -n "$msg" ] && echo "$msg" >&2
     error "$tuntap"
     return 1
@@ -427,7 +473,10 @@ createTap() {
   disableIPv6 "$TAP"
 
   if ! ip link set dev "$TAP" master "$BRIDGE"; then
-    error "failed to set master bridge!" && return 1
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
+    error "failed to set master bridge!"
+    return 1
   fi
 
   return 0
@@ -435,26 +484,9 @@ createTap() {
 
 checkExistingTables() {
 
+  local msg=""
   local rules=""
   local conflicts=""
-
-  rules=$(iptables -t nat -S PREROUTING 2>/dev/null || true)
-  conflicts=$(grep -E -- \
-    '^-A PREROUTING .*(-j DNAT|-j REDIRECT)( |$)' \
-    <<< "$rules" || true)
-
-  if [ -n "$conflicts" ]; then
-    local msg="existing NAT rules may take precedence over container port forwarding"
-    if enabled "$DEBUG"; then
-      warn "${msg}."
-    else
-      warn "${msg}; enable DEBUG=Y to inspect them."
-    fi
-  fi
-
-  if enabled "$DEBUG" && [ -n "$rules" ]; then
-    printf "Existing NAT PREROUTING rules:\n\n%s\n\n" "$rules"
-  fi
 
   rules=$(iptables -t filter -S FORWARD 2>/dev/null || true)
   conflicts=$(grep -E -- \
@@ -462,7 +494,8 @@ checkExistingTables() {
     <<< "$rules" || true)
 
   if [ -n "$conflicts" ]; then
-    local msg="existing firewall rules may block traffic forwarded to or from the VM subnet"
+    msg="existing firewall rules may block traffic forwarded to or from the VM subnet"
+
     if enabled "$DEBUG"; then
       warn "${msg}."
     else
@@ -482,12 +515,6 @@ checkExistingTables() {
       printf "Existing NAT POSTROUTING rules:\n\n%s\n\n" "$rules"
     fi
 
-    rules=$(iptables -t mangle -S FORWARD 2>/dev/null || true)
-
-    if [ -n "$rules" ]; then
-      printf "Existing mangle FORWARD rules:\n\n%s\n\n" "$rules"
-    fi
-
   fi
 
   return 0
@@ -501,22 +528,26 @@ configureTables() {
   local tables="the 'ip_tables' kernel module is not loaded. Try this command: sudo modprobe ip_tables iptable_nat"
 
   if ! clearTables; then
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
     error "failed to select a working IP tables backend!"
     return 1
   fi
 
   checkExistingTables
 
-  # NAT traffic from the VM subnet leaving through any external interface.
+  # Apply source NAT to traffic leaving the VM subnet through the uplink.
   if ! iptables -t nat -A POSTROUTING \
-    ! -o "$BRIDGE" \
+    -o "$DEV" \
     -s "$subnet" \
     ! -d "$subnet" \
     -m comment --comment "$rule_tag" \
     -j MASQUERADE > /dev/null 2>&1; then
 
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
     if ! iptables -t nat -A POSTROUTING \
-      ! -o "$BRIDGE" \
+      -o "$DEV" \
       -s "$subnet" \
       ! -d "$subnet" \
       -m comment --comment "$rule_tag" \
@@ -526,41 +557,50 @@ configureTables() {
     fi
   fi
 
-  # Clamp TCP MSS to avoid subtle MTU blackholes when the outer path has a smaller MTU.
-  iptables -t mangle -A FORWARD \
-    -s "$subnet" \
-    -p tcp \
-    --tcp-flags SYN,RST SYN \
-    -m comment --comment "$rule_tag" \
-    -j TCPMSS --clamp-mss-to-pmtu > /dev/null 2>&1 || true
-
-  iptables -t mangle -A FORWARD \
-    -d "$subnet" \
-    -p tcp \
-    --tcp-flags SYN,RST SYN \
-    -m comment --comment "$rule_tag" \
-    -j TCPMSS --clamp-mss-to-pmtu > /dev/null 2>&1 || true
-
-  # Allow forwarding from the VM bridge to external interfaces.
+  # Allow connections initiated from the VM subnet.
   if ! iptables -A FORWARD \
     -i "$BRIDGE" \
-    ! -o "$BRIDGE" \
+    -o "$DEV" \
     -s "$subnet" \
+    -m conntrack --ctstate NEW,ESTABLISHED,RELATED \
     -m comment --comment "$rule_tag" \
-    -j ACCEPT; then
-    error "$tables_err"
-    return 1
+    -j ACCEPT > /dev/null 2>&1; then
+
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
+    if ! iptables -A FORWARD \
+      -i "$BRIDGE" \
+      -o "$DEV" \
+      -s "$subnet" \
+      -m conntrack --ctstate NEW,ESTABLISHED,RELATED \
+      -m comment --comment "$rule_tag" \
+      -j ACCEPT; then
+      error "$tables_err"
+      return 1
+    fi
   fi
 
-  # Allow forwarding from external interfaces to the VM subnet.
+  # Allow only reply traffic for connections initiated from the VM subnet.
   if ! iptables -A FORWARD \
-    ! -i "$BRIDGE" \
+    -i "$DEV" \
     -o "$BRIDGE" \
     -d "$subnet" \
+    -m conntrack --ctstate ESTABLISHED,RELATED \
     -m comment --comment "$rule_tag" \
-    -j ACCEPT; then
-    error "$tables_err"
-    return 1
+    -j ACCEPT > /dev/null 2>&1; then
+
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
+    if ! iptables -A FORWARD \
+      -i "$DEV" \
+      -o "$BRIDGE" \
+      -d "$subnet" \
+      -m conntrack --ctstate ESTABLISHED,RELATED \
+      -m comment --comment "$rule_tag" \
+      -j ACCEPT; then
+      error "$tables_err"
+      return 1
+    fi
   fi
 
   return 0
@@ -569,7 +609,8 @@ configureTables() {
 configureNAT() {
 
   local base=""
-  local rc msg=""
+  local rc=0
+  local msg=""
   local subnet=""
   local gateway=""
   local forwarding=""
@@ -585,20 +626,32 @@ configureNAT() {
 
     if (( rc == 0 )); then
       chmod 666 /dev/net/tun
-    elif [ -n "$msg" ]; then
-      echo "$msg" >&2
+    elif ! enabled "$ROOTLESS" || enabled "$DEBUG"; then
+      [ -n "$msg" ] && echo "$msg" >&2
     fi
   fi
 
-  [ ! -c /dev/net/tun ] && error "$tuntap" && return 1
+  if [ ! -c /dev/net/tun ]; then
+    enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
+    error "$tuntap"
+    return 1
+  fi
 
   # Check IPv4 port forwarding flag
-  [ -r /proc/sys/net/ipv4/ip_forward ] &&
+  if [ -r /proc/sys/net/ipv4/ip_forward ]; then
     forwarding=$(< /proc/sys/net/ipv4/ip_forward)
+  fi
 
   if [[ "$forwarding" != "1" ]]; then
     { sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1; rc=$?; } || :
-    if (( rc != 0 )) || [[ $(< /proc/sys/net/ipv4/ip_forward) -eq 0 ]]; then
+
+    if (( rc != 0 )) ||
+      [[ ! -r /proc/sys/net/ipv4/ip_forward ]] ||
+      [[ $(< /proc/sys/net/ipv4/ip_forward) -eq 0 ]]; then
+
+      enabled "$ROOTLESS" && ! enabled "$DEBUG" && return 1
+
       error "IP forwarding is disabled. $ADD_ERR --sysctl net.ipv4.ip_forward=1"
       return 1
     fi
@@ -616,7 +669,7 @@ configureNAT() {
   createBridge "$gateway" || return 1
   createTap "$tuntap" || return 1
 
-  # Use the lowest effective VM-LAN MTU, without mutating the parent/uplink MTU.
+  # Use the lowest effective VM-LAN MTU, without mutating the uplink MTU.
   if [[ "$LAN_MTU" != "0" ]]; then
     LAN_MTU=$(minMTU "$LAN_MTU" "$(getMTU "$BRIDGE")" "$(getMTU "$TAP")")
   fi
@@ -663,7 +716,6 @@ selectTables() {
 
   local mode=""
   local current=""
-  local engine="${ENGINE:-}"
   local modes=()
 
   # Keep the currently selected backend when it is fully functional.
@@ -677,7 +729,7 @@ selectTables() {
     modes=( "legacy" )
   elif [[ "$current" == *"legacy"* ]]; then
     modes=( "nft" )
-  elif [[ "${engine,,}" == "docker" ]]; then
+  elif [[ "${ENGINE,,}" == "docker" ]]; then
     modes=( "legacy" "nft" )
   else
     modes=( "nft" "legacy" )
@@ -686,7 +738,10 @@ selectTables() {
   for mode in "${modes[@]}"; do
 
     command -v "iptables-$mode" > /dev/null 2>&1 || continue
-    setTables "$mode" && testTables && return 0
+
+    if setTables "$mode" && testTables; then
+      return 0
+    fi
 
   done
 
@@ -705,7 +760,9 @@ clearTables() {
   selectTables || return 1
 
   # Store the current iptables ruleset.
-  ! rules=$(iptables-save 2> /dev/null) && return 1
+  if ! rules=$(iptables-save 2>/dev/null); then
+    return 1
+  fi
 
   if [ -n "$rules" ]; then
 
@@ -783,7 +840,10 @@ validateMask() {
 
 validateAddresses() {
 
-  [ -z "$UPLINK" ] && error "Could not determine container IPv4 address!" && exit 26
+  if [ -z "$UPLINK" ]; then
+    error "Could not determine container IPv4 address!"
+    exit 26
+  fi
 
   return 0
 }
@@ -816,7 +876,8 @@ configureMTU() {
 
   # Automatically propagate smaller-than-standard MTUs, but do not automatically
   # advertise jumbo frames unless the user explicitly requested MTU.
-  if [[ "$LAN_MTU" != "0" && "$LAN_MTU" -gt "1500" ]] && ! enabled "$mtu_custom"; then
+  if [[ "$LAN_MTU" != "0" && "$LAN_MTU" -gt "1500" ]] &&
+    ! enabled "$mtu_custom"; then
     LAN_MTU="1500"
   fi
 
@@ -826,7 +887,6 @@ configureMTU() {
 configureMAC() {
 
   local container=""
-
   container=$(containerID)
 
   if [ -z "$MAC" ]; then
@@ -847,8 +907,8 @@ configureMAC() {
     exit 28
   fi
 
-  # Keep the guest-facing gateway MAC stable across runs, otherwise Windows guests
-  # may detect a new network every boot.
+  # Keep the guest-facing gateway MAC stable across runs, otherwise guests may
+  # detect a new network every boot.
   GATEWAY_MAC=$(gatewayMAC "$MAC")
 
   return 0
@@ -875,28 +935,31 @@ showHostInfo() {
   local mtu=""
   local host=""
   local uplink=""
+  local line=""
+  local obvious=""
+  local gateway="${GATEWAY:-}"
+  local iface="$DEV"
+  local nameservers=""
+  local file="/etc/resolv.dnsmasq"
 
   uplink=$(formatAddress "$UPLINK" "$PREFIX" || true)
   [ -z "$uplink" ] && uplink="(none)"
 
-  local line="❯ Host: $uplink"
+  line="❯ Host: $uplink"
 
   host=$(containerID)
   [ -n "$host" ] && line+=" ($host)"
 
-  local obvious=""
   if [[ "$uplink" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
     obvious="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}.1"
   fi
 
-  local gateway="${GATEWAY:-}"
   if [ -z "$gateway" ]; then
     line+="  |  Gateway: (none)"
   elif [[ "$gateway" != "$obvious" ]]; then
     line+="  |  Gateway: $gateway"
   fi
 
-  local iface="$DEV"
   if [ -n "$NIC" ] && [[ "${NIC,,}" != "veth" ]]; then
     iface+="/$NIC"
   fi
@@ -905,16 +968,18 @@ showHostInfo() {
   [[ "$iface" != "eth0" ]] && line+="  |  Interface: $iface"
 
   mtu=$(getMTU "$DEV")
+
   if [ -n "$mtu" ] && [[ "$mtu" != "0" && "$mtu" != "1500" ]]; then
     line+="  |  MTU: $mtu"
   fi
 
-  local nameservers=""
-  local file="/etc/resolv.dnsmasq"
   [ ! -f "$file" ] && file="/etc/resolv.conf"
 
   if [ -f "$file" ]; then
-    nameservers=$(grep '^nameserver ' "$file" | sed 's/^nameserver //' | paste -sd ',' | sed 's/,/, /g')
+    nameservers=$(grep '^nameserver ' "$file" |
+      sed 's/^nameserver //' |
+      paste -sd ',' |
+      sed 's/,/, /g')
   fi
 
   [ -z "$nameservers" ] && nameservers="(none)"
@@ -941,19 +1006,21 @@ showBridgeInfo() {
   local base=""
   local dhcp=""
   local display=""
+  local line=""
 
   display=$(formatAddress "$gateway" "$PREFIX" || true)
 
   base="${gateway%.*}"
   dhcp="$base.2-$base.254"
 
-  local line="❯ Bridge: $BRIDGE  |  Gateway: $display  |  DHCP: $dhcp"
+  line="❯ Bridge: $BRIDGE  |  Gateway: $display  |  DHCP: $dhcp"
 
   if [[ "$PREFIX" != "24" ]]; then
     line+="  |  Subnet: $subnet"
   fi
 
   mtu=$(getMTU "$BRIDGE")
+
   if [ -n "$mtu" ] && [[ "$mtu" != "0" && "$mtu" != "1500" ]]; then
     line+="  |  MTU: $mtu"
   fi
@@ -987,8 +1054,13 @@ prepareNetwork() {
 blockLicense() {
 
   # Block connection attempts to license server
-  sed -i -E '/^[[:space:]]*[^#]*[[:space:]]shop\.maurer-it\.com([[:space:]]|$)/d' /etc/hosts 2>/dev/null || true
-  printf '%s\n' '127.0.0.1 shop.maurer-it.com' '::1 shop.maurer-it.com' >> /etc/hosts 2>/dev/null || true
+  sed -i -E \
+    '/^[[:space:]]*[^#]*[[:space:]]shop\.maurer-it\.com([[:space:]]|$)/d' \
+    /etc/hosts 2>/dev/null || true
+
+  printf '%s\n' \
+    '127.0.0.1 shop.maurer-it.com' \
+    '::1 shop.maurer-it.com' >> /etc/hosts 2>/dev/null || true
 
   return 0
 }
@@ -998,6 +1070,9 @@ blockLicense() {
 # ######################################
 
 blockLicense
+
+detectEngine
+detectRootless
 
 disabled "$NETWORK" && return 0
 
