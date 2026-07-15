@@ -29,7 +29,7 @@ ADD_ERR="Please add the following setting to your container:"
 isNAT() {
 
   case "${NETWORK,,}" in
-    "tap" | "tun" | "tuntap" | "y" | "" )
+    "nat" | "tap" | "tun" | "tuntap" | "y" | "" )
       return 0 ;;
     *)
       return 1 ;;
@@ -93,6 +93,11 @@ maskToCIDR() {
   local mask="$1"
   local prefix=""
 
+  if ! command -v ipcalc > /dev/null 2>&1; then
+    error "Required command 'ipcalc' is not installed!"
+    return 1
+  fi
+
   prefix=$(ipcalc -n -b "0.0.0.0/$mask" 2>/dev/null | awk '
     /^Netmask:/ {
       for (i = 1; i <= NF; i++) {
@@ -104,8 +109,8 @@ maskToCIDR() {
     }
   ')
 
-  if [[ ! "$prefix" =~ ^[0-9]+$ ]] || (( prefix < 1 || prefix > 30 )); then
-    error "Invalid MASK: '$mask'"
+  if [[ ! "$prefix" =~ ^[0-9]+$ ]] || (( prefix < 1 || prefix > 24 )); then
+    error "Invalid MASK: '$mask' (supported range: /1 through /24)"
     return 1
   fi
 
@@ -154,6 +159,8 @@ detectInterface() {
 }
 
 detectAddresses() {
+
+  local rc=0
 
   GATEWAY=$(ip route list dev "$DEV" | awk ' /^default/ {print $3}' | head -n 1)
   { UPLINK=$(ip address show dev "$DEV" | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/ | head -n 1); } 2>/dev/null || :
@@ -359,13 +366,15 @@ EOF
 createBridge() {
 
   local gateway="$1"
-  local rc
+  local rc msg=""
 
   # Create a bridge with a static IP for the VM LAN
-  { ip link add dev "$BRIDGE" type bridge; rc=$?; } || :
+  { msg=$(ip link add dev "$BRIDGE" type bridge 2>&1); rc=$?; } || :
 
   if (( rc != 0 )); then
-    error "failed to create bridge. $ADD_ERR --cap-add NET_ADMIN" && return 1
+    [ -n "$msg" ] && echo "$msg" >&2
+    error "failed to create bridge. $ADD_ERR --cap-add NET_ADMIN"
+    return 1
   fi
 
   if [[ "$LAN_MTU" != "0" ]]; then
@@ -390,10 +399,15 @@ createBridge() {
 createTap() {
 
   local tuntap="$1"
+  local rc msg=""
 
   # Set tap to the bridge created
-  if ! ip tuntap add dev "$TAP" mode tap; then
-    error "$tuntap" && return 1
+  { msg=$(ip tuntap add dev "$TAP" mode tap 2>&1); rc=$?; } || :
+
+  if (( rc != 0 )); then
+    [ -n "$msg" ] && echo "$msg" >&2
+    error "$tuntap"
+    return 1
   fi
 
   if [[ "$LAN_MTU" != "0" ]]; then
@@ -419,6 +433,66 @@ createTap() {
   return 0
 }
 
+checkExistingTables() {
+
+  local rules=""
+  local conflicts=""
+
+  rules=$(iptables -t nat -S PREROUTING 2>/dev/null || true)
+  conflicts=$(grep -E -- \
+    '^-A PREROUTING .*(-j DNAT|-j REDIRECT)( |$)' \
+    <<< "$rules" || true)
+
+  if [ -n "$conflicts" ]; then
+    local msg="existing NAT rules may take precedence over container port forwarding"
+    if enabled "$DEBUG"; then
+      warn "${msg}."
+    else
+      warn "${msg}; enable DEBUG=Y to inspect them."
+    fi
+  fi
+
+  if enabled "$DEBUG" && [ -n "$rules" ]; then
+    printf "Existing NAT PREROUTING rules:\n\n%s\n\n" "$rules"
+  fi
+
+  rules=$(iptables -t filter -S FORWARD 2>/dev/null || true)
+  conflicts=$(grep -E -- \
+    '^-A FORWARD .*(-j DROP|-j REJECT)( |$)' \
+    <<< "$rules" || true)
+
+  if [ -n "$conflicts" ]; then
+    local msg="existing firewall rules may block traffic forwarded to or from the VM subnet"
+    if enabled "$DEBUG"; then
+      warn "${msg}."
+    else
+      warn "${msg}; enable DEBUG=Y to inspect them."
+    fi
+  fi
+
+  if enabled "$DEBUG" && [ -n "$rules" ]; then
+    printf "Existing filter FORWARD rules:\n\n%s\n\n" "$rules"
+  fi
+
+  if enabled "$DEBUG"; then
+
+    rules=$(iptables -t nat -S POSTROUTING 2>/dev/null || true)
+
+    if [ -n "$rules" ]; then
+      printf "Existing NAT POSTROUTING rules:\n\n%s\n\n" "$rules"
+    fi
+
+    rules=$(iptables -t mangle -S FORWARD 2>/dev/null || true)
+
+    if [ -n "$rules" ]; then
+      printf "Existing mangle FORWARD rules:\n\n%s\n\n" "$rules"
+    fi
+
+  fi
+
+  return 0
+}
+
 configureTables() {
 
   local subnet="$1"
@@ -431,14 +505,25 @@ configureTables() {
     return 1
   fi
 
-  # NAT traffic from bridge subnet to Docker uplink
+  checkExistingTables
+
+  # NAT traffic from the VM subnet leaving through any external interface.
   if ! iptables -t nat -A POSTROUTING \
-    -o "$DEV" \
+    ! -o "$BRIDGE" \
     -s "$subnet" \
     ! -d "$subnet" \
     -m comment --comment "$rule_tag" \
-    -j MASQUERADE; then
-    error "$tables" && return 1
+    -j MASQUERADE > /dev/null 2>&1; then
+
+    if ! iptables -t nat -A POSTROUTING \
+      ! -o "$BRIDGE" \
+      -s "$subnet" \
+      ! -d "$subnet" \
+      -m comment --comment "$rule_tag" \
+      -j MASQUERADE; then
+      error "$tables"
+      return 1
+    fi
   fi
 
   # Clamp TCP MSS to avoid subtle MTU blackholes when the outer path has a smaller MTU.
@@ -449,22 +534,33 @@ configureTables() {
     -m comment --comment "$rule_tag" \
     -j TCPMSS --clamp-mss-to-pmtu > /dev/null 2>&1 || true
 
-  # Allow outbound traffic from the Proxmox VM subnet to the Docker uplink.
+  iptables -t mangle -A FORWARD \
+    -d "$subnet" \
+    -p tcp \
+    --tcp-flags SYN,RST SYN \
+    -m comment --comment "$rule_tag" \
+    -j TCPMSS --clamp-mss-to-pmtu > /dev/null 2>&1 || true
+
+  # Allow forwarding from the VM bridge to external interfaces.
   if ! iptables -A FORWARD \
+    -i "$BRIDGE" \
+    ! -o "$BRIDGE" \
     -s "$subnet" \
-    -o "$DEV" \
     -m comment --comment "$rule_tag" \
     -j ACCEPT; then
-    error "$tables_err" && return 1
+    error "$tables_err"
+    return 1
   fi
 
-  # Allow return and related traffic from the Docker uplink.
+  # Allow forwarding from external interfaces to the VM subnet.
   if ! iptables -A FORWARD \
+    ! -i "$BRIDGE" \
+    -o "$BRIDGE" \
     -d "$subnet" \
-    -i "$DEV" \
     -m comment --comment "$rule_tag" \
     -j ACCEPT; then
-    error "$tables_err" && return 1
+    error "$tables_err"
+    return 1
   fi
 
   return 0
@@ -472,31 +568,41 @@ configureTables() {
 
 configureNAT() {
 
+  local base=""
+  local rc msg=""
+  local subnet=""
+  local gateway=""
+  local forwarding=""
   local tuntap="TUN device is missing. $ADD_ERR --device /dev/net/tun"
-  local rc
 
   enabled "$DEBUG" && echo "Configuring NAT networking..."
 
   # Create the necessary file structure for /dev/net/tun
   if [ ! -c /dev/net/tun ]; then
-    [ ! -d /dev/net ] && mkdir -m 755 /dev/net
-    if mknod /dev/net/tun c 10 200; then
+    [ ! -d /dev/net ] && mkdir -m 755 /dev/net > /dev/null 2>&1 || :
+
+    { msg=$(mknod /dev/net/tun c 10 200 2>&1); rc=$?; } || :
+
+    if (( rc == 0 )); then
       chmod 666 /dev/net/tun
+    elif [ -n "$msg" ]; then
+      echo "$msg" >&2
     fi
   fi
 
   [ ! -c /dev/net/tun ] && error "$tuntap" && return 1
 
   # Check IPv4 port forwarding flag
-  if [[ $(< /proc/sys/net/ipv4/ip_forward) -eq 0 ]]; then
+  [ -r /proc/sys/net/ipv4/ip_forward ] &&
+    forwarding=$(< /proc/sys/net/ipv4/ip_forward)
+
+  if [[ "$forwarding" != "1" ]]; then
     { sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1; rc=$?; } || :
     if (( rc != 0 )) || [[ $(< /proc/sys/net/ipv4/ip_forward) -eq 0 ]]; then
       error "IP forwarding is disabled. $ADD_ERR --sysctl net.ipv4.ip_forward=1"
       return 1
     fi
   fi
-
-  local base gateway subnet
 
   base=$(subnetBase "$UPLINK") || return 1
   gateway="$base.1"
@@ -542,9 +648,13 @@ setTables() {
 
 testTables() {
 
-  # Test actual ruleset access instead of only checking the binary version.
-  iptables -w -t nat -S > /dev/null 2>&1 || return 1
-  iptables-save -t nat > /dev/null 2>&1 || return 1
+  local table=""
+
+  # Test every table required by the networking rules.
+  for table in nat filter; do
+    iptables -w -t "$table" -S > /dev/null 2>&1 || return 1
+    iptables-save -t "$table" > /dev/null 2>&1 || return 1
+  done
 
   return 0
 }
@@ -552,13 +662,25 @@ testTables() {
 selectTables() {
 
   local mode=""
+  local current=""
+  local engine="${ENGINE:-}"
   local modes=()
 
-  # Prefer nftables for Podman, but retain legacy first for Docker.
-  if [[ "${container:-}" == *"podman"* ]]; then
-    modes=( "nft" "legacy" )
-  else
+  # Keep the currently selected backend when it is fully functional.
+  if testTables; then
+    return 0
+  fi
+
+  current=$(iptables --version 2>/dev/null || true)
+
+  if [[ "$current" == *"nf_tables"* ]]; then
+    modes=( "legacy" )
+  elif [[ "$current" == *"legacy"* ]]; then
+    modes=( "nft" )
+  elif [[ "${engine,,}" == "docker" ]]; then
     modes=( "legacy" "nft" )
+  else
+    modes=( "nft" "legacy" )
   fi
 
   for mode in "${modes[@]}"; do
@@ -584,30 +706,33 @@ clearTables() {
 
   # Store the current iptables ruleset.
   ! rules=$(iptables-save 2> /dev/null) && return 1
-  [ -z "$rules" ] && return 0
 
-  # Delete every rule tagged with our unique identifier,
-  # leaving all other rules intact.
-  while IFS= read -r line; do
+  if [ -n "$rules" ]; then
 
-    case "$line" in
-      \*nat ) table="nat" ;;
-      \*filter ) table="filter" ;;
-      \*mangle ) table="mangle" ;;
-      \*raw ) table="raw" ;;
-    esac
+    # Delete every rule tagged with our unique identifier,
+    # leaving all other rules intact.
+    while IFS= read -r line; do
 
-    if [[ "$line" == -A* ]] && [[ "$line" =~ $re ]]; then
-      line="${line/-A /-D }"
+      case "$line" in
+        \*nat ) table="nat" ;;
+        \*filter ) table="filter" ;;
+        \*mangle ) table="mangle" ;;
+        \*raw ) table="raw" ;;
+      esac
 
-      # Parse the quoting produced by iptables-save before deleting the rule.
-      if ! printf '%s\n' "$line" |
-        xargs -r iptables -t "$table" > /dev/null 2>&1; then
-        failed="Y"
+      if [[ "$line" == -A* ]] && [[ "$line" =~ $re ]]; then
+        line="${line/-A /-D }"
+
+        # Parse the quoting produced by iptables-save before deleting the rule.
+        if ! printf '%s\n' "$line" |
+          xargs -r iptables -t "$table" > /dev/null 2>&1; then
+          failed="Y"
+        fi
       fi
-    fi
 
-  done <<< "$rules"
+    done <<< "$rules"
+
+  fi
 
   enabled "$failed" && return 1
   return 0
@@ -617,7 +742,7 @@ clearTables() {
 #  Cleanup
 # ######################################
 
-closeBridge() {
+closeInterfaces() {
 
   ip link set "$TAP" down promisc off &> /dev/null || :
   ip link delete "$TAP" &> /dev/null || :
@@ -885,12 +1010,12 @@ msg="Initializing network..."
 enabled "$DEBUG" && info "$msg"
 
 prepareNetwork
-closeBridge
+closeInterfaces
 
 # Configure NAT networking
 if ! configureNAT; then
 
-  closeBridge
+  closeInterfaces
   error "failed to setup NAT networking!"
   [[ "$DEBUG" != [Yy1]* ]] && exit 48
 
