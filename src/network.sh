@@ -474,18 +474,37 @@ createTap() {
   return 0
 }
 
+showRules() {
+
+  local table="$1"
+  local chain="$2"
+  local label="$3"
+  local rules=""
+
+  rules=$(iptables -t "$table" -S "$chain" 2>/dev/null |
+    awk '$1 == "-A"' || true)
+
+  [ -n "$rules" ] || return 0
+
+  printf "Existing %s rules:\n\n%s\n\n" "$label" "$rules"
+  return 0
+}
+
 checkExistingTables() {
 
+  local msg=""
   local rules=""
   local conflicts=""
 
-  rules=$(iptables -t filter -S FORWARD 2>/dev/null || true)
+  rules=$(iptables -t filter -S FORWARD 2>/dev/null |
+    awk '$1 == "-A"' || true)
+
   conflicts=$(grep -E -- \
     '^-A FORWARD .*(-j DROP|-j REJECT)( |$)' \
     <<< "$rules" || true)
 
   if [ -n "$conflicts" ]; then
-    local msg="existing firewall rules may block traffic forwarded to or from the VM subnet"
+    msg="your existing firewall rules may block traffic forwarded to or from the VM subnet"
 
     if enabled "$DEBUG"; then
       warn "${msg}."
@@ -494,18 +513,9 @@ checkExistingTables() {
     fi
   fi
 
-  if enabled "$DEBUG" && [ -n "$rules" ]; then
-    printf "Existing filter FORWARD rules:\n\n%s\n\n" "$rules"
-  fi
-
   if enabled "$DEBUG"; then
-
-    rules=$(iptables -t nat -S POSTROUTING 2>/dev/null || true)
-
-    if [ -n "$rules" ]; then
-      printf "Existing NAT POSTROUTING rules:\n\n%s\n\n" "$rules"
-    fi
-
+    showRules filter FORWARD "filter FORWARD"
+    showRules nat POSTROUTING "NAT POSTROUTING"
   fi
 
   return 0
