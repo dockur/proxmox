@@ -11,8 +11,6 @@ set -Eeuo pipefail
 : "${BRIDGE:="vmbr0"}"
 : "${MASK:="255.255.255.0"}"
 
-: "${ENGINE:=""}"
-: "${ROOTLESS:="N"}"
 
 # Sanitize variables
 DEV=$(strip "$DEV")
@@ -142,37 +140,6 @@ networkCIDR() {
   return 0
 }
 
-detectEngine() {
-
-  if [ -f "/run/.containerenv" ]; then
-    ENGINE="${container:-}"
-
-    if [[ "${ENGINE,,}" == *"podman"* ]]; then
-      ENGINE="Podman"
-    else
-      [ -z "$ENGINE" ] && ENGINE="Kubernetes"
-    fi
-  elif [ -f "/.dockerenv" ]; then
-    ENGINE="Docker"
-  fi
-
-  return 0
-}
-
-detectRootless() {
-
-  local uid_map=""
-
-  uid_map=$(awk '{$1=$1; print}' /proc/self/uid_map 2>/dev/null || true)
-
-  if [[ "$uid_map" == "0 0 4294967295" ]]; then
-    ROOTLESS="N"
-  else
-    ROOTLESS="Y"
-  fi
-
-  return 0
-}
 
 detectInterface() {
 
@@ -351,7 +318,7 @@ configureDNS() {
     filter_dns="filter-AAAA"
   fi
 
-  if ! sed 's/^    //' > "$file" <<EOF
+  if ! sed 's/^    //' > "$file" <<EOF2
 
     # Listen only on bridge
     interface=$fa
@@ -376,7 +343,7 @@ configureDNS() {
     # Windows compatibility
     dhcp-option=252,"\n"
     dhcp-option=vendor:MSFT,2,1i
-EOF
+EOF2
   then
     error "Failed to write dnsmasq config file: $file"
     return 1
@@ -394,10 +361,10 @@ setInterfaces() {
   # Add all available network interfaces
   local file="/etc/network/interfaces.new"
 
-  if ! sed 's/^    //' > "$file" <<EOF
+  if ! sed 's/^    //' > "$file" <<EOF2
     auto lo
     iface lo inet loopback
-EOF
+EOF2
   then
     error "Failed to write network interface config file: $file"
     return 1
@@ -407,11 +374,11 @@ EOF
 
     [[ "${i,,}" == "${fa,,}" ]] && continue
 
-    if ! sed 's/^        //' >> "$file" <<EOF
+    if ! sed 's/^        //' >> "$file" <<EOF2
 
         auto $i
         iface $i inet manual
-EOF
+EOF2
     then
       error "Failed to append interface $i to config file: $file"
       return 1
@@ -420,7 +387,7 @@ EOF
   done < <(ip -o link show | awk -F': ' '{ print $2 }' | grep -v lo | sed 's/@.*//')
 
   # Configure bridge
-  if ! sed 's/^    //' >> "$file" <<EOF
+  if ! sed 's/^    //' >> "$file" <<EOF2
 
     auto $fa
     iface $fa inet static
@@ -430,7 +397,7 @@ EOF
         bridge-fd 0
 
     source /etc/network/interfaces.d/*
-EOF
+EOF2
   then
     error "Failed to append bridge config to file: $file"
     return 1
@@ -1141,10 +1108,9 @@ showHostInfo() {
   [ ! -f "$file" ] && file="/etc/resolv.conf"
 
   if [ -f "$file" ]; then
-    nameservers=$(grep '^nameserver ' "$file" |
-      sed 's/^nameserver //' |
+    nameservers=$(awk '$1 == "nameserver" { print $2 }' "$file" |
       paste -sd ',' |
-      sed 's/,/, /g')
+      sed 's/,/, /g' || true)
   fi
 
   [ -z "$nameservers" ] && nameservers="(none)"
@@ -1234,9 +1200,6 @@ blockLicense() {
 # ######################################
 
 blockLicense
-
-detectEngine
-detectRootless
 
 disabled "$NETWORK" && return 0
 
