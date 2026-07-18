@@ -11,7 +11,6 @@ set -Eeuo pipefail
 : "${BRIDGE:="vmbr0"}"
 : "${MASK:="255.255.255.0"}"
 
-
 # Sanitize variables
 DEV=$(strip "$DEV")
 MTU=$(strip "$MTU")
@@ -139,7 +138,6 @@ networkCIDR() {
   echo "$network"
   return 0
 }
-
 
 detectInterface() {
 
@@ -756,11 +754,31 @@ clearTables() {
   return 0
 }
 
+hasTaggedRules() {
+
+  local save="$1"
+  local rules=""
+  local rule_tag="PROXMOX_NAT"
+  local own_rule="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
+
+  # Return 2 when the backend cannot be inspected.
+  if ! rules=$("$save" 2>/dev/null); then
+    return 2
+  fi
+
+  if grep -Eq -- "$own_rule" <<< "$rules"; then
+    return 0
+  fi
+
+  return 1
+}
+
 configureTables() {
 
   local subnet="$1"
   local preferred=""
-  local alternate="" rc=0
+  local alternate=""
+  local alternate_save=""
   local preferred_clean="N"
   local alternate_dirty="N"
 
@@ -776,6 +794,47 @@ configureTables() {
       error "unsupported IP tables backend: $preferred"
       return 1 ;;
   esac
+
+  # Inspect the alternate backend without changing the active alternative.
+  alternate_save=$(command -v "iptables-$alternate-save" 2>/dev/null || true)
+
+  if [ -n "$alternate_save" ]; then
+
+    if hasTaggedRules "$alternate_save"; then
+
+      # Only switch backends when stale Proxmox rules were positively found.
+      if ! setTables "$alternate"; then
+        error "failed to select the $alternate IP tables backend for cleanup!"
+        return 1
+      fi
+
+      if ! clearTables; then
+        alternate_dirty="Y"
+      fi
+
+      # Always restore the originally selected backend after cleanup.
+      if ! setTables "$preferred"; then
+        error "failed to restore the preferred $preferred IP tables backend!"
+        return 1
+      fi
+
+      if enabled "$alternate_dirty"; then
+        error "failed to clean up the existing $alternate IP tables configuration!"
+        return 1
+      fi
+
+    else
+
+      local rc=$?
+
+      # An unavailable alternate backend does not affect normal startup.
+      if (( rc == 2 )) && enabled "$DEBUG"; then
+        warn "failed to inspect the $alternate IP tables backend!"
+      fi
+
+    fi
+
+  fi
 
   # Try the preferred backend first.
   if clearTables; then
@@ -796,7 +855,7 @@ configureTables() {
 
   else
 
-    rc=$?
+    local rc=$?
 
     # The preferred backend was accessible, but its rules could not be removed.
     # Do not switch while partial or stale rules may still be active.
@@ -834,7 +893,7 @@ configureTables() {
 
     else
 
-      rc=$?
+      local rc=$?
 
       # Only mark the alternate backend dirty when it was accessible but cleanup failed.
       if (( rc == 1 )); then
