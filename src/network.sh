@@ -623,6 +623,19 @@ tableError() {
   return 1
 }
 
+showTableCleanupError() {
+
+  local command="$1"
+  local message="$2"
+
+  enabled "$DEBUG" || return 0
+
+  printf "Failed IP tables cleanup command:\n\n%s\n\n" "$command" >&2
+  [ -n "$message" ] && printf "%s\n\n" "$message" >&2
+
+  return 0
+}
+
 applyTables() {
 
   local subnet="$1"
@@ -672,13 +685,19 @@ applyTables() {
 clearTables() {
 
   local table="" line=""
-  local rules="" failed="N"
+  local rules="" remaining="" message=""
   local rule_tag="PROXMOX_NAT"
-  local re="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
+  local own_rule="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
 
   # Return 2 when the currently selected backend cannot be accessed.
   # This lets configureTables() distinguish it from an actual rule-cleanup failure.
   if ! rules=$(iptables-save 2> /dev/null); then
+
+    if enabled "$DEBUG"; then
+      message=$(iptables-save 2>&1 > /dev/null || true)
+      showTableCleanupError "iptables-save" "$message"
+    fi
+
     return 2
   fi
 
@@ -695,13 +714,15 @@ clearTables() {
         \*raw ) table="raw" ;;
       esac
 
-      if [[ "$line" == -A* ]] && [[ "$line" =~ $re ]]; then
+      if [[ "$line" == -A* ]] && [[ "$line" =~ $own_rule ]]; then
         line="${line/-A /-D }"
 
         # Parse the quoting produced by iptables-save before deleting the rule.
-        if ! printf '%s\n' "$line" |
-          xargs -r iptables -t "$table" > /dev/null 2>&1; then
-          failed="Y"
+        if ! message=$(
+          printf '%s\n' "$line" |
+            xargs -r iptables -t "$table" 2>&1
+        ); then
+          showTableCleanupError "iptables -t $table $line" "$message"
         fi
       fi
 
@@ -709,7 +730,29 @@ clearTables() {
 
   fi
 
-  enabled "$failed" && return 1
+  # Base the result on the final ruleset instead of intermediate errors.
+  if ! rules=$(iptables-save 2> /dev/null); then
+
+    if enabled "$DEBUG"; then
+      message=$(iptables-save 2>&1 > /dev/null || true)
+      showTableCleanupError "iptables-save" "$message"
+    fi
+
+    return 1
+  fi
+
+  remaining=$(grep -E -- "$own_rule" <<< "$rules" || true)
+
+  if [ -n "$remaining" ]; then
+
+    if enabled "$DEBUG"; then
+      warn "IP tables cleanup left the following rules behind:"
+      echo "$remaining" >&2
+    fi
+
+    return 1
+  fi
+
   return 0
 }
 
