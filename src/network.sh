@@ -308,7 +308,7 @@ configureDNS() {
   local filter_dns=""
 
   if [[ "$LAN_MTU" != "0" && "$LAN_MTU" != "1500" ]]; then
-    mtu_option="dhcp-option=option:interface-mtu,$LAN_MTU"
+    mtu_option="dhcp-option=option:mtu,$LAN_MTU"
   fi
 
   # Avoid returning IPv6 records when the active network mode is IPv4-only.
