@@ -1,5 +1,7 @@
 on: [workflow_call]
+
 name: "Check"
+
 permissions: {}
 
 jobs:
@@ -7,24 +9,29 @@ jobs:
     name: shellcheck
     runs-on: ubuntu-latest
     steps:
-    - 
-      name: Checkout code
-      uses: actions/checkout@v7
-    - parallel:
       -
-        name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@master
-        env:
-          SHELLCHECK_OPTS: -x --source-path=src -e SC2114 -e SC2129 -e SC2034 -e SC1087 -e SC2317 -e SC2046
-      -
-        name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.3.0
-        with:
-          dockerfile: Dockerfile
-          ignore: DL3008,DL3018,DL3020,DL3029,DL3059,DL4006,DL4001,SC2114,DL3006,DL3027
-          failure-threshold: warning
-      -
-        name: Validate JSON and YML files
-        uses: GrantBirki/json-yaml-validate@v5.0.0
-        with:
-          yaml_exclude_regex: ".*\\kubernetes\\.yml$"
+        name: Checkout code
+        uses: actions/checkout@v7
+      - parallel:
+          -
+            name: Run ShellCheck
+            uses: ludeeus/action-shellcheck@master
+            env:
+              SHELLCHECK_OPTS: >-
+                -x
+                --source-path=src
+                -e SC2129
+                -e SC2034
+                -e SC2317
+          -
+            name: Lint Dockerfile
+            uses: hadolint/hadolint-action@v3.3.0
+            with:
+              dockerfile: Dockerfile
+              ignore: DL3008,DL3018,DL3020,DL3029,DL3059,DL4001,DL3006
+              failure-threshold: warning
+          -
+            name: Validate JSON and YML files
+            uses: GrantBirki/json-yaml-validate@v5.0.0
+            with:
+              yaml_exclude_regex: ".*\\kubernetes\\.yml$"
