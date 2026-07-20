@@ -12,7 +12,7 @@ ARG DEBCONF_NOWARNINGS="yes"
 ARG DEBIAN_FRONTEND="noninteractive"
 ARG DEBCONF_NONINTERACTIVE_SEEN="true"
 
-SHELL ["/bin/bash", "-c"]
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN <<EOF
   # Break on errors
@@ -187,7 +187,8 @@ IUD
   sed -i "s|the Pxvirt Powered by Lierfang\.|Proxmox for Docker v${VERSION_ARG}.|g" /usr/bin/pvebanner
 
   # Remove kernel modules and boot files — useless in a container (~960 MB)
-  rm -rf /usr/lib/modules /boot
+  rm -rf /usr/lib/modules
+  find /boot -mindepth 1 -delete
 
   # Remove hardware firmware blobs — no physical hardware in a container (~520 MB)
   rm -rf /usr/lib/firmware
