@@ -26,7 +26,7 @@ jobs:
             uses: hadolint/hadolint-action@v3.3.0
             with:
               dockerfile: Dockerfile
-              ignore: DL3008,DL3018,DL3020,DL3029,DL3059,DL4001,DL4006,DL3006
+              ignore: DL3008,DL3029,DL4001,DL4006,DL3006
               failure-threshold: warning
           -
             name: Validate JSON and YML files
