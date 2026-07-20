@@ -20,8 +20,6 @@ jobs:
               SHELLCHECK_OPTS: >-
                 -x
                 --source-path=src
-                -e SC2129
-                -e SC2034
                 -e SC2317
           -
             name: Lint Dockerfile
