@@ -51,8 +51,7 @@ getMTU() {
 
 minMTU() {
 
-  local mtu=""
-  local min=""
+  local mtu min=""
 
   for mtu in "$@"; do
     [[ -z "$mtu" || "$mtu" == "0" ]] && continue
@@ -91,7 +90,7 @@ gatewayMAC() {
 maskToCIDR() {
 
   local mask="$1"
-  local prefix=""
+  local prefix
 
   if ! command -v ipcalc > /dev/null 2>&1; then
     error "Required command 'ipcalc' is not installed!"
@@ -121,7 +120,7 @@ maskToCIDR() {
 networkCIDR() {
 
   local ip="$1"
-  local network=""
+  local network
 
   network=$(ipcalc -n -b "$ip/$MASK" 2>/dev/null | awk '
     /^Network:/ {
@@ -160,8 +159,6 @@ detectInterface() {
 
 detectAddresses() {
 
-  local rc=0
-
   GATEWAY=$(ip route list dev "$DEV" | awk '/^default/ { print $3 }' | head -n 1)
   { UPLINK=$(ip address show dev "$DEV" | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/ | head -n 1); } 2>/dev/null || :
 
@@ -170,7 +167,7 @@ detectAddresses() {
   if [ -f /proc/net/if_inet6 ] &&
     [[ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null)" != "1" ]]; then
 
-    { IP6=$(ip -6 addr show dev "$DEV" scope global up); rc=$?; } 2>/dev/null || :
+    { IP6=$(ip -6 addr show dev "$DEV" scope global up); local rc=$?; } 2>/dev/null || :
     (( rc != 0 )) && IP6=""
 
     [ -n "$IP6" ] &&
@@ -182,7 +179,7 @@ detectAddresses() {
 
 detectAdapter() {
 
-  local result=""
+  local result
 
   NIC=""
   BUS=""
@@ -208,7 +205,7 @@ detectAdapter() {
 
 containerID() {
 
-  local id=""
+  local id
 
   id=$(hostname -s 2>/dev/null || true)
 
@@ -216,7 +213,7 @@ containerID() {
     id=$(< /etc/machine-id)
   fi
 
-  if [ -z "$id" ] && [ -s /proc/sys/kernel/random/boot_id ]; then
+  if [ -z "$id" ] && [ -r /proc/sys/kernel/random/boot_id ]; then
     id=$(< /proc/sys/kernel/random/boot_id)
   fi
 
@@ -242,7 +239,7 @@ disableIPv6() {
 subnetInUse() {
 
   local subnet="$1"
-  local broader="" narrower="" routes=""
+  local broader narrower routes
 
   if ! broader=$(ip -4 route show table all match "$subnet" 2>/dev/null); then
     error "Failed to inspect existing routes for subnet $subnet."
@@ -266,22 +263,18 @@ subnetInUse() {
 subnetBase() {
 
   local ip="$1"
-  local third=""
-  local second=""
-  local base=""
-  local subnet=""
-  local rc=0
+  local third second
 
   third=$(cut -d. -f3 <<< "$ip")
 
   for second in {30..254}; do
-    base="172.$second.$third"
-    subnet="$base.0/$PREFIX"
+    local base="172.$second.$third"
+    local subnet="$base.0/$PREFIX"
 
     if subnetInUse "$subnet"; then
       continue
     else
-      rc=$?
+      local rc=$?
       (( rc == 1 )) || return 1
     fi
 
@@ -411,10 +404,10 @@ EOF2
 createBridge() {
 
   local gateway="$1"
-  local rc msg=""
+  local msg
 
   # Create a bridge with a static IP for the VM LAN
-  { msg=$(ip link add dev "$BRIDGE" type bridge 2>&1); rc=$?; } || :
+  { msg=$(ip link add dev "$BRIDGE" type bridge 2>&1); local rc=$?; } || :
 
   if (( rc != 0 )); then
     [ -n "$msg" ] && echo "$msg" >&2
@@ -452,10 +445,10 @@ createBridge() {
 createTap() {
 
   local tuntap="$1"
-  local rc msg=""
+  local msg
 
   # Set tap to the bridge created
-  { msg=$(ip tuntap add dev "$TAP" mode tap 2>&1); rc=$?; } || :
+  { msg=$(ip tuntap add dev "$TAP" mode tap 2>&1); local rc=$?; } || :
 
   if (( rc != 0 )); then
     [ -n "$msg" ] && echo "$msg" >&2
@@ -493,7 +486,7 @@ createTap() {
 
 getTablesBackend() {
 
-  local version=""
+  local version
   version=$(iptables --version 2>/dev/null || true)
 
   case "$version" in
@@ -506,7 +499,7 @@ getTablesBackend() {
 setTables() {
 
   local mode="$1"
-  local path=""
+  local path
 
   path=$(command -v "iptables-$mode" 2>/dev/null || true)
   [ -z "$path" ] && return 1
@@ -520,7 +513,7 @@ showRules() {
   local chain="$2"
   local label="$3"
   local rule_tag="$4"
-  local rules=""
+  local rules
   local own_rule="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
 
   enabled "$DEBUG" || return 0
@@ -539,7 +532,7 @@ showRules() {
 
 checkExistingTables() {
 
-  local msg="" rules="" conflicts=""
+  local rules conflicts
   local rule_tag="PROXMOX_NAT"
   local own_rule="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
 
@@ -554,7 +547,7 @@ checkExistingTables() {
     <<< "$rules" || true)
 
   if [ -n "$conflicts" ]; then
-    msg="your existing firewall rules may block traffic forwarded to or from the VM subnet"
+    local msg="your existing firewall rules may block traffic forwarded to or from the VM subnet"
 
     if enabled "$DEBUG"; then
       warn "${msg}."
@@ -573,13 +566,13 @@ runTableRule() {
 
   local silent="$1"
   local result="$2"
-  local rc msg=""
+  local msg
 
   shift 2
 
   printf -v "$result" '%s' ""
 
-  { msg=$("$@" 2>&1); rc=$?; } || :
+  { msg=$("$@" 2>&1); local rc=$?; } || :
   (( rc == 0 )) && return 0
 
   printf -v "$result" '%s' "$msg"
@@ -638,7 +631,7 @@ applyTables() {
 
   local subnet="$1"
   local silent="${2:-N}"
-  local table_error=""
+  local table_error
   local rule_tag="PROXMOX_NAT"
 
   # NAT traffic from the VM subnet leaving through any external interface.
@@ -682,8 +675,8 @@ applyTables() {
 
 clearTables() {
 
-  local table="" line=""
-  local rules="" remaining="" message=""
+  local table=""
+  local line rules remaining
   local rule_tag="PROXMOX_NAT"
   local own_rule="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
 
@@ -692,6 +685,7 @@ clearTables() {
   if ! rules=$(iptables-save 2> /dev/null); then
 
     if enabled "$DEBUG"; then
+      local message
       message=$(iptables-save 2>&1 > /dev/null || true)
       showTableCleanupError "iptables-save" "$message"
     fi
@@ -716,6 +710,7 @@ clearTables() {
         line="${line/-A /-D }"
 
         # Parse the quoting produced by iptables-save before deleting the rule.
+        local message
         if ! message=$(
           printf '%s\n' "$line" |
             xargs -r iptables -t "$table" 2>&1
@@ -732,6 +727,7 @@ clearTables() {
   if ! rules=$(iptables-save 2> /dev/null); then
 
     if enabled "$DEBUG"; then
+      local message
       message=$(iptables-save 2>&1 > /dev/null || true)
       showTableCleanupError "iptables-save" "$message"
     fi
@@ -757,7 +753,7 @@ clearTables() {
 hasTaggedRules() {
 
   local save="$1"
-  local rules=""
+  local rules
   local rule_tag="PROXMOX_NAT"
   local own_rule="--comment[[:space:]]+\"?$rule_tag\"?([[:space:]]|\$)"
 
@@ -776,9 +772,8 @@ hasTaggedRules() {
 configureTables() {
 
   local subnet="$1"
-  local preferred=""
-  local alternate=""
-  local alternate_save=""
+  local preferred
+  local alternate_save
   local preferred_clean="N"
   local alternate_dirty="N"
 
@@ -788,8 +783,8 @@ configureTables() {
   }
 
   case "$preferred" in
-    "nft" ) alternate="legacy" ;;
-    "legacy" ) alternate="nft" ;;
+    "nft" ) local alternate="legacy" ;;
+    "legacy" ) local alternate="nft" ;;
     * )
       error "unsupported IP tables backend: $preferred"
       return 1 ;;
@@ -950,10 +945,7 @@ configureTables() {
 
 configureNAT() {
 
-  local base=""
-  local rc msg=""
-  local subnet=""
-  local gateway=""
+  local base subnet
   local forwarding=""
   local tuntap="TUN device is missing. $ADD_ERR --device /dev/net/tun"
 
@@ -963,7 +955,8 @@ configureNAT() {
   if [ ! -c /dev/net/tun ]; then
     [ ! -d /dev/net ] && mkdir -m 755 /dev/net > /dev/null 2>&1 || :
 
-    { msg=$(mknod /dev/net/tun c 10 200 2>&1); rc=$?; } || :
+    local msg
+    { msg=$(mknod /dev/net/tun c 10 200 2>&1); local rc=$?; } || :
 
     if (( rc == 0 )); then
       chmod 666 /dev/net/tun
@@ -982,7 +975,7 @@ configureNAT() {
     forwarding=$(< /proc/sys/net/ipv4/ip_forward)
 
   if [[ "$forwarding" != "1" ]]; then
-    { sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1; rc=$?; } || :
+    { sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1; local rc=$?; } || :
 
     forwarding=""
     [ -r /proc/sys/net/ipv4/ip_forward ] &&
@@ -995,14 +988,14 @@ configureNAT() {
   fi
 
   base=$(subnetBase "$UPLINK") || return 1
-  gateway="$base.1"
+  local gateway="$base.1"
   subnet=$(networkCIDR "$gateway") || return 1
 
   if subnetInUse "$subnet"; then
     error "VM subnet $subnet conflicts with an existing route inside the container."
     return 1
   else
-    rc=$?
+    local rc=$?
     (( rc == 1 )) || return 1
   fi
 
@@ -1112,8 +1105,7 @@ configureMTU() {
 
 configureMAC() {
 
-  local container=""
-
+  local container
   container=$(containerID)
 
   if [ -z "$MAC" ]; then
@@ -1159,8 +1151,7 @@ formatAddress() {
 
 showHostInfo() {
 
-  local mtu="" host="" uplink="" prefix=""
-
+  local prefix
   prefix=$(ip -4 -o address show dev "$DEV" scope global 2>/dev/null |
     awk -v ip="$UPLINK" '
       {
@@ -1172,11 +1163,13 @@ showHostInfo() {
       }
     ')
 
+  local uplink
   uplink=$(formatAddress "$UPLINK" "$prefix" || true)
   [ -z "$uplink" ] && uplink="(none)"
 
   local line="❯ Host: $uplink"
 
+  local host
   host=$(containerID)
   [ -n "$host" ] && line+=" ($host)"
 
@@ -1200,6 +1193,7 @@ showHostInfo() {
   [ -z "$iface" ] && iface="(none)"
   [[ "$iface" != "eth0" ]] && line+="  |  Interface: $iface"
 
+  local mtu
   mtu=$(getMTU "$DEV")
   if [ -n "$mtu" ] && [[ "$mtu" != "0" && "$mtu" != "1500" ]]; then
     line+="  |  MTU: $mtu"
@@ -1235,22 +1229,19 @@ showBridgeInfo() {
 
   local subnet="$1"
   local gateway="$2"
-  local mtu=""
-  local base=""
-  local dhcp=""
-  local display=""
 
+  local display
   display=$(formatAddress "$gateway" "$PREFIX" || true)
 
-  base="${gateway%.*}"
-  dhcp="$base.2-$base.254"
-
+  local base="${gateway%.*}"
+  local dhcp="$base.2-$base.254"
   local line="❯ Bridge: $BRIDGE  |  Gateway: $display  |  DHCP: $dhcp"
 
   if [[ "$PREFIX" != "24" ]]; then
     line+="  |  Subnet: $subnet"
   fi
 
+  local mtu
   mtu=$(getMTU "$BRIDGE")
   if [ -n "$mtu" ] && [[ "$mtu" != "0" && "$mtu" != "1500" ]]; then
     line+="  |  MTU: $mtu"
