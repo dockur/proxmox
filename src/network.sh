@@ -157,9 +157,31 @@ detectInterface() {
   return 0
 }
 
+defaultGateway() {
+
+  ip -4 route list default dev "$1" 2>/dev/null |
+    awk '$1 == "default" { for (i = 1; i < NF; i++) if ($i == "via") { print $(i + 1); exit } }' || :
+
+  return 0
+}
+
+addUpstream() {
+
+  local upstream="$1"
+
+  [ -n "$upstream" ] || return 1
+
+  if ! ip address add "$upstream/32" dev "$BRIDGE"; then
+    warn "failed to add upstream IP alias."
+    return 1
+  fi
+
+  return 0
+}
+
 detectAddresses() {
 
-  GATEWAY=$(ip route list dev "$DEV" | awk '/^default/ { print $3 }' | head -n 1)
+  GATEWAY=$(defaultGateway "$DEV")
   { UPLINK=$(ip address show dev "$DEV" | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/ | head -n 1); } 2>/dev/null || :
 
   IP6=""
@@ -295,14 +317,19 @@ configureDNS() {
   local fa="$1"
   local mask="$2"
   local gateway="$3"
+  local upstream="${4:-}"
   local base="${gateway%.*}"
   local file="/etc/dnsmasq.d/$fa.conf"
   local mtu_option=""
   local filter_dns=""
+  local upstream_entry=""
 
   if [[ "$LAN_MTU" != "0" && "$LAN_MTU" != "1500" ]]; then
     mtu_option="dhcp-option=option:mtu,$LAN_MTU"
   fi
+
+  [ -n "$upstream" ] &&
+    upstream_entry="address=/system.lan/$upstream"
 
   # Avoid returning IPv6 records when the active network mode is IPv4-only.
   if isNAT || [ -z "$IP6" ]; then
@@ -317,7 +344,7 @@ configureDNS() {
     except-interface=lo
 
     # IPv4 DHCP range
-    dhcp-range=set:${fa},${base}.2,${base}.254
+    dhcp-range=set:${fa},${base}.2,${base}.253
 
     # Set gateway address
     dhcp-option=option:netmask,$mask
@@ -326,6 +353,7 @@ configureDNS() {
     $mtu_option
 
     address=/host.lan/$gateway
+    $upstream_entry
     $filter_dns
 
     # DHCP settings
@@ -630,7 +658,9 @@ showTableCleanupError() {
 applyTables() {
 
   local subnet="$1"
-  local silent="${2:-N}"
+  local upstream="${2:-}"
+  local gateway="${3:-}"
+  local silent="${4:-N}"
   local table_error
   local rule_tag="PROXMOX_NAT"
 
@@ -644,6 +674,22 @@ applyTables() {
     -j MASQUERADE; then
     tableError "$silent" "$table_error"
     return 1
+  fi
+
+  # Forward the reserved system.lan alias to the container upstream gateway.
+  if [ -n "$upstream" ] && [ -n "$gateway" ]; then
+
+    if ! runTableRule "$silent" table_error \
+      iptables -t nat -A PREROUTING \
+      -i "$BRIDGE" \
+      -s "$subnet" \
+      -d "$upstream" \
+      -m comment --comment "$rule_tag" \
+      -j DNAT --to-destination "$gateway"; then
+      tableError "$silent" "$table_error"
+      return 1
+    fi
+
   fi
 
   # Allow traffic from the VM bridge to any external interface.
@@ -772,6 +818,8 @@ hasTaggedRules() {
 configureTables() {
 
   local subnet="$1"
+  local upstream="${2:-}"
+  local gateway="${3:-}"
   local preferred
   local alternate_save
   local preferred_clean="N"
@@ -837,7 +885,7 @@ configureTables() {
     preferred_clean="Y"
 
     # Try the preferred backend without reporting provisional failures.
-    if applyTables "$subnet" "Y"; then
+    if applyTables "$subnet" "$upstream" "$gateway" "Y"; then
       checkExistingTables
       return 0
     fi
@@ -876,7 +924,7 @@ configureTables() {
     # Remove rules left by a previous run from the alternate backend.
     if clearTables; then
 
-      if applyTables "$subnet" "Y"; then
+      if applyTables "$subnet" "$upstream" "$gateway" "Y"; then
         checkExistingTables
         return 0
       fi
@@ -930,7 +978,7 @@ configureTables() {
   fi
 
   # Repeat the preferred backend once to show its actual failure.
-  if applyTables "$subnet" "N"; then
+  if applyTables "$subnet" "$upstream" "$gateway" "N"; then
     checkExistingTables
     return 0
   fi
@@ -945,7 +993,7 @@ configureTables() {
 
 configureNAT() {
 
-  local base subnet
+  local base subnet upstream=""
   local forwarding=""
   local tuntap="TUN device is missing. $ADD_ERR --device /dev/net/tun"
 
@@ -1002,15 +1050,21 @@ configureNAT() {
   createBridge "$gateway" || return 1
   createTap "$tuntap" || return 1
 
+  # Reserve the final usable address for access to the upstream gateway.
+  if [ -n "$GATEWAY" ]; then
+    upstream="$base.254"
+    addUpstream "$upstream" || upstream=""
+  fi
+
   # Use the lowest effective VM-LAN MTU, without mutating the uplink MTU.
   if [[ "$LAN_MTU" != "0" ]]; then
     LAN_MTU=$(minMTU "$LAN_MTU" "$(getMTU "$BRIDGE")" "$(getMTU "$TAP")")
   fi
 
-  configureTables "$subnet" || return 1
+  configureTables "$subnet" "$upstream" "$GATEWAY" || return 1
 
   setInterfaces "$BRIDGE" "$TAP" "$gateway" || return 1
-  configureDNS "$BRIDGE" "$MASK" "$gateway" || return 1
+  configureDNS "$BRIDGE" "$MASK" "$gateway" "$upstream" || return 1
 
   showBridgeInfo "$subnet" "$gateway"
 
@@ -1234,7 +1288,7 @@ showBridgeInfo() {
   display=$(formatAddress "$gateway" "$PREFIX" || true)
 
   local base="${gateway%.*}"
-  local dhcp="$base.2-$base.254"
+  local dhcp="$base.2-$base.253"
   local line="❯ Bridge: $BRIDGE  |  Gateway: $display  |  DHCP: $dhcp"
 
   if [[ "$PREFIX" != "24" ]]; then
