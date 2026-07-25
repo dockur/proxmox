@@ -328,8 +328,7 @@ configureDNS() {
     mtu_option="dhcp-option=option:mtu,$LAN_MTU"
   fi
 
-  [ -n "$upstream" ] &&
-    upstream_entry="address=/system.lan/$upstream"
+  [ -n "$upstream" ] && upstream_entry="address=/system.lan/$upstream"
 
   # Avoid returning IPv6 records when the active network mode is IPv4-only.
   if isNAT || [ -z "$IP6" ]; then
