@@ -4,6 +4,7 @@ set -Eeuo pipefail
 # Docker environment variables
 : "${DEBUG:="N"}"            # Enable debugging
 : "${PASSWORD:="root"}"      # Default password
+: "${PASSWORD_HASH:=""}"     # Default password hash
 : "${REQUIRE_KVM:="Y"}"      # Require /dev/kvm by default
 : "${REQUIRE_FUSE:="Y"}"     # Require /dev/fuse by default
 : "${SHM_SIZE:="1G"}"        # Remount /dev/shm to this size
@@ -299,8 +300,11 @@ echo ""
 # Check command before doing one-time setup.
 check_systemd_command "$@"
 
-# Update password for root
-printf 'root:%s\n' "$PASSWORD" | chpasswd
+if [ -n "$PASSWORD_HASH" ]; then
+  usermod -p  root <<<"$PASSWORD_HASH"
+else
+  printf 'root:%s\n' "$PASSWORD" | chpasswd
+fi
 
 # Runtime checks
 check_privileged
