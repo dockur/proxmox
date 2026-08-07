@@ -21,7 +21,7 @@ Proxmox VE inside a Docker container.
 - Supports fast KVM-accelerated virtual machines
 - Supports LXC containers out of the box
 - Includes a pre-configured NAT bridge with DHCP
-- Supports ARM64 systems through PXVIRT
+- Supports both AMD64 and ARM64 host platforms
 
 ## Usage  🐳
 

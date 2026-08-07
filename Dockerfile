@@ -62,19 +62,11 @@ RUN <<EOF
     isc-dhcp-client
 
   # Add Proxmox archive keyring
-  if [[ "$TARGETARCH" == "amd64" ]]; then
-    KEY_URL="https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg"
-    KEY_PATH="/usr/share/keyrings/proxmox-archive-keyring.gpg"
-    URI="http://download.proxmox.com/debian/pve"
-    SUITE="trixie"
-    COMPONENT="pve-no-subscription"
-  elif [[ "$TARGETARCH" == "arm64" ]]; then
-    KEY_URL="https://mirrors.lierfang.com/pxcloud/lierfang.gpg"
-    KEY_PATH="/usr/share/keyrings/lierfang.gpg"
-    URI="https://mirrors.lierfang.com/pxcloud/pxvirt"
-    SUITE="trixie"
-    COMPONENT="main"
-  fi
+  KEY_URL="https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg"
+  KEY_PATH="/usr/share/keyrings/proxmox-archive-keyring.gpg"
+  URI="http://download.proxmox.com/debian/pve"
+  SUITE="trixie"
+  COMPONENT="pve-no-subscription"
 
   curl -fsSL "${KEY_URL}" -o "${KEY_PATH}"
 
@@ -122,11 +114,9 @@ shift\n[ $# -gt 0 ] && exec "$@"\nexit 0\n' > /usr/bin/unshare
     /etc/apt/sources.list.d/ceph.sources
 
   # Disable subscription nag popup
-  if [[ "$TARGETARCH" == "amd64" ]]; then
-    wget https://github.com/Jamesits/pve-fake-subscription/releases/download/v0.0.11/pve-fake-subscription_0.0.11+git-1_all.deb -O /tmp/sub.deb -q --timeout=10
-    apt-get install -y --no-install-recommends /tmp/sub.deb
-    rm -f /tmp/sub.deb
-  fi
+  wget https://github.com/Jamesits/pve-fake-subscription/releases/download/v0.0.11/pve-fake-subscription_0.0.11+git-1_all.deb -O /tmp/sub.deb -q --timeout=10
+  apt-get install -y --no-install-recommends /tmp/sub.deb
+  rm -f /tmp/sub.deb
 
   # Prevent system updates
   apt-mark hold proxmox-ve
@@ -184,7 +174,6 @@ IUD
   sed -i "s|https://\${urlip}:8006/|http://127.0.0.1:8006|g" /usr/bin/pvebanner
   sed -i "s|https://\${localip}:8006/|http://127.0.0.1:8006|g" /usr/bin/pvebanner
   sed -i "s|the Proxmox Virtual Environment\.|Proxmox for Docker v${VERSION_ARG}.|g" /usr/bin/pvebanner
-  sed -i "s|the Pxvirt Powered by Lierfang\.|Proxmox for Docker v${VERSION_ARG}.|g" /usr/bin/pvebanner
 
   # Remove kernel modules and boot files — useless in a container (~960 MB)
   rm -rf /usr/lib/modules
