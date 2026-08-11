@@ -301,7 +301,7 @@ echo ""
 check_systemd_command "$@"
 
 if [ -n "$PASSWORD_HASH" ]; then
-  usermod -p  root <<<"$PASSWORD_HASH"
+  printf 'root:%s\n' "$PASSWORD_HASH" | chpasswd -e
 else
   printf 'root:%s\n' "$PASSWORD" | chpasswd
 fi
