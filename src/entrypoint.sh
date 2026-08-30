@@ -159,6 +159,59 @@ check_kvm() {
   return 0
 }
 
+check_kernel_features() {
+
+  local kernel_release
+  local kernel_version
+  local kernel_major
+  local kernel_minor
+  local io_uring_disabled=""
+  local probe=""
+
+  kernel_release="$(uname -r)"
+  kernel_version="${kernel_release%%-*}"
+  IFS=. read -r kernel_major kernel_minor _ <<< "$kernel_version"
+  kernel_major="${kernel_major:-0}"
+  kernel_minor="${kernel_minor:-0}"
+
+  if (( kernel_major < 3 || (kernel_major == 3 && kernel_minor < 15) )); then
+    warn "Host kernel ${kernel_release} is older than Linux 3.15, the minimum supported by systemd 257. The container may not work correctly; upgrading the host kernel is recommended."
+  fi
+
+  if [ -r /proc/sys/kernel/io_uring_disabled ]; then
+    io_uring_disabled="$(cat /proc/sys/kernel/io_uring_disabled 2>/dev/null || true)"
+
+    if [ "$io_uring_disabled" = "2" ]; then
+      warn "io_uring is disabled by the host kernel. Proxmox defaults compatible VM disks to aio=io_uring, so affected VMs may fail to start. Enable io_uring on the host or set the disk Async IO mode to threads."
+      return 0
+    fi
+  fi
+
+  if command -v qemu-img >/dev/null 2>&1; then
+    probe="/tmp/.proxmox-io-uring.$$"
+    : > "$probe"
+
+    if ! qemu-img info --image-opts "driver=raw,file.driver=file,file.filename=$probe,file.aio=io_uring" >/dev/null 2>&1; then
+      rm -f "$probe"
+
+      if (( kernel_major < 5 || (kernel_major == 5 && kernel_minor < 1) )); then
+        warn "Host kernel ${kernel_release} does not provide usable io_uring support. Proxmox defaults compatible VM disks to aio=io_uring, so affected VMs may fail to start. Upgrade the host kernel or set the disk Async IO mode to threads."
+      else
+        warn "io_uring is unavailable from inside this container. Check host kernel and container security restrictions. Proxmox defaults compatible VM disks to aio=io_uring, so affected VMs may fail to start; set the disk Async IO mode to threads if io_uring cannot be enabled."
+      fi
+    fi
+
+    rm -f "$probe"
+    return 0
+  fi
+
+  if (( kernel_major < 5 || (kernel_major == 5 && kernel_minor < 1) )); then
+    warn "Host kernel ${kernel_release} predates upstream io_uring support in Linux 5.1. Proxmox defaults compatible VM disks to aio=io_uring, so affected VMs may fail to start. Upgrade the host kernel or set the disk Async IO mode to threads."
+  fi
+
+  return 0
+}
+
 check_cgroups() {
 
   if [ ! -d /sys/fs/cgroup ]; then
@@ -311,6 +364,7 @@ check_privileged
 check_cgroups
 check_fuse
 check_kvm
+check_kernel_features
 
 # Set shm size to prevent cluster joining issues.
 remount_shm
