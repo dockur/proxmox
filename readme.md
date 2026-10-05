@@ -1,4 +1,6 @@
 <h1 align="center">Proxmox<br />
+
+[![Deploy to Railyard](https://app.railyard.run/deploy/badge)](https://app.railyard.run/deploy?repo=https://github.com/dockur/proxmox)
 <div align="center">
 <a href="https://github.com/dockur/proxmox/"><img src="https://github.com/dockur/proxmox/raw/master/.github/logo.png" title="Logo" style="max-width:100%;" width="128" /></a>
 </div>
